@@ -16,7 +16,7 @@
 <style>
 :root{
   --bg:#F2F2F7; --card:#FFFFFF; --text:#1C1C1E; --muted:#8E8E93; --line:#E5E5EA;
-  --accent:#0A84FF; --today:#0A84FF; --danger:#FF3B30; --sheet:#FFFFFF; --field:#F2F2F7;
+  --accent:#0A84FF; --today:#0A84FF; --danger:#FF3B30; --ok:#34C759; --sheet:#FFFFFF; --field:#F2F2F7;
   --req:#FF9500; --once:#34C759; --temp:#AF52DE;
   --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05);
 }
@@ -45,21 +45,42 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .icon-btn:disabled{color:var(--muted);opacity:.45}
 .icon-btn:active:not(:disabled){transform:scale(.92)}
 
+/* ---------- счётчик недели ---------- */
+.week{display:block;width:100%;text-align:left;background:var(--card);border-radius:16px;padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow)}
+.week-top{display:flex;align-items:baseline;gap:6px;font-size:15px}
+.week-top b{font-size:17px}
+.week-top .more{margin-left:auto;color:var(--accent);font-size:14px;font-weight:600}
+.bar{height:6px;border-radius:3px;background:var(--field);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;border-radius:3px;background:var(--ok);transition:width .4s}
+
 /* ---------- карточка дня ---------- */
-.day{background:var(--card);border-radius:18px;padding:14px 14px 6px;margin-bottom:14px;box-shadow:var(--shadow)}
+.day{background:var(--card);border-radius:18px;padding:14px 14px 6px;margin-bottom:12px;box-shadow:var(--shadow);transition:box-shadow .2s}
 .day.today{box-shadow:0 0 0 2px var(--today),var(--shadow)}
-.day-head{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.day.collapsed{padding:0}
+.day.drop{box-shadow:0 0 0 2px var(--accent),var(--shadow)}
+.day-head{display:flex;align-items:center;gap:8px;width:100%;text-align:left}
+.day.collapsed .day-head{padding:14px}
 .dn{font-size:22px;font-weight:800}
 .dd{font-size:14px;color:var(--muted);font-weight:500}
 .day.today .dd{color:var(--today);font-weight:700}
+.prog{margin-left:auto;font-size:14px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.prog.full{color:var(--ok)}
+.dchev{color:var(--muted);font-size:20px;transition:transform .2s;margin-left:2px}
+.day:not(.collapsed) .dchev{transform:rotate(90deg)}
+.sum{font-size:13px;color:var(--muted);margin-top:1px}
+.day .bar{margin:8px 0 2px}
 .sec{margin-top:8px}
 .sec-head{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;
   text-transform:uppercase;letter-spacing:.03em;color:var(--sc);margin:6px 0 2px}
 .sec-head button{font-size:13px;color:var(--accent);text-transform:none;letter-spacing:0;font-weight:600;padding:4px 0}
 
 /* ---------- пункты ---------- */
-.items{list-style:none;margin:0;padding:0}
+.items{list-style:none;margin:0;padding:0;min-height:6px}
 .item{position:relative;overflow:hidden;border-radius:10px}
+.item.dragged{display:none}
+.ph{height:40px;border-radius:10px;border:2px dashed var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent);margin:2px 0}
+.ghost{border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);transform:scale(1.03);opacity:.95}
+.ghost .item-in{border-radius:10px}
 .del-bg{position:absolute;inset:0;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:flex-end;
   padding-right:16px;font-size:15px;font-weight:600;opacity:0}
 .item.swiping .del-bg{opacity:1}
@@ -70,9 +91,13 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   color:#fff;font-size:14px;font-weight:800}
 .item.done .cb{background:var(--sc);border-color:var(--sc)}
 .txt{flex:1;min-width:0;word-break:break-word;padding-top:1px;min-height:24px}
-.item.done .txt{color:var(--muted);text-decoration:line-through}
-.moved{display:block;font-size:12px;color:var(--danger);text-decoration:none;font-weight:500}
-.edit-in,.add input{width:100%;border:0;outline:none;background:transparent;color:var(--text);font:inherit;font-size:17px;padding:0}
+.item.done .txt{color:var(--muted)}
+.item.done .tt{text-decoration:line-through}
+.moved{display:block;font-size:12px;color:var(--danger);font-weight:500}
+.note{display:block;font-size:13px;color:var(--muted);margin-top:1px}
+.edit-box{flex:1;min-width:0}
+.edit-in,.note-in,.add input{width:100%;border:0;outline:none;background:transparent;color:var(--text);font:inherit;font-size:17px;padding:0}
+.note-in{font-size:15px;color:var(--muted);margin-top:6px;padding:6px 8px;background:var(--field);border-radius:8px}
 .add{display:flex;align-items:center;gap:10px;padding:8px 2px;color:var(--muted)}
 .add .plus{width:24px;height:24px;border-radius:12px;display:grid;place-items:center;font-size:20px;color:var(--sc);flex:none}
 .add input::placeholder{color:var(--muted)}
@@ -97,7 +122,18 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .sheet ul{padding-left:20px;margin:6px 0 10px}
 .btn{display:block;width:100%;padding:15px;border-radius:14px;font-weight:700;font-size:17px;text-align:center;margin-top:10px;background:var(--field)}
 .btn.primary{background:var(--accent);color:#fff}
-.group-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;margin:18px 2px 6px}
+.group-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;margin:18px 2px 6px;display:flex;justify-content:space-between}
+.hday{background:var(--field);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.hday summary{list-style:none;padding:12px 14px;display:flex;justify-content:space-between;font-weight:600;font-size:16px;cursor:pointer}
+.hday summary::-webkit-details-marker{display:none}
+.hday summary span{color:var(--muted);font-variant-numeric:tabular-nums}
+.hday summary span.full{color:var(--ok)}
+.hbody{padding:0 14px 10px}
+.hsec{font-size:12px;font-weight:700;text-transform:uppercase;margin:8px 0 2px}
+.hit{display:flex;gap:8px;font-size:15px;padding:3px 0;color:var(--text)}
+.hit .m{width:18px;flex:none;text-align:center;font-weight:800}
+.hit.no{color:var(--muted)}
+.hit small{display:block;color:var(--muted);font-size:13px}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 20px);transform:translate(-50%,20px);
   background:rgba(30,30,30,.94);color:#fff;padding:10px 12px 10px 18px;border-radius:22px;font-size:15px;z-index:100;
   opacity:0;transition:.25s;pointer-events:none;display:flex;align-items:center;gap:12px;white-space:nowrap}
@@ -118,6 +154,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
       <button class="icon-btn" data-act="menu" aria-label="Меню">•••</button>
     </div>
   </header>
+  <button class="week" data-act="history" id="week"></button>
   <div id="days"></div>
 </div>
 <div id="sheetRoot"></div>
@@ -130,12 +167,15 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 const KEY = 'nedelya-v1', UI_KEY = 'nedelya-ui';
 const DAYS = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
 const DAYS_GEN = ['понедельника','вторника','среды','четверга','пятницы','субботы','воскресенья'];
+const DAYS_ACC = ['понедельник','вторник','среду','четверг','пятницу','субботу','воскресенье'];
 const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const SECS = {
   req:  {title:'Обязательные', ph:'Добавить обязательное дело', color:'var(--req)'},
   once: {title:'Разовые дела', ph:'Добавить разовое дело',      color:'var(--once)'},
   temp: {title:'Список на день', ph:'Добавить в список',         color:'var(--temp)'}
 };
+const SEC_KEYS = ['req','once','temp'];
+const HISTORY_DAYS = 120;
 const pad = n => String(n).padStart(2,'0');
 const dkey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const parseKey = k => { const [y,m,d] = k.split('-').map(Number); return new Date(y,m-1,d); };
@@ -144,16 +184,21 @@ const today = () => { const n = new Date(); return new Date(n.getFullYear(), n.g
 const wdi = d => (d.getDay()+6)%7;   // 0 = понедельник
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+function plural(n, one, few, many){
+  const a = Math.abs(n)%100, b = a%10;
+  if(a>10 && a<20) return many; if(b===1) return one; if(b>=2 && b<=4) return few; return many;
+}
+const fmtDate = d => `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
 
 /* ============ Данные ============ */
 function emptyState(){
   const w = () => ({0:[],1:[],2:[],3:[],4:[],5:[],6:[]});
-  return {version:1, req:w(), once:w(), temp:w(), lastDate:null};
+  return {version:2, req:w(), once:w(), temp:w(), lastDate:null, history:{}};
 }
 function normalize(s){
   if(!s || typeof s!=='object') throw new Error('bad');
   const out = emptyState();
-  for(const sec of ['req','once','temp']){
+  for(const sec of SEC_KEYS){
     if(!s[sec] || typeof s[sec]!=='object') continue;
     for(let d=0; d<7; d++){
       const arr = Array.isArray(s[sec][d]) ? s[sec][d] : [];
@@ -161,11 +206,21 @@ function normalize(s){
         .map(x => {
           const it = {id: typeof x.id==='string' ? x.id : uid(), text: x.text.slice(0,300), done: !!x.done};
           if(Number.isInteger(x.moved) && x.moved>=0 && x.moved<7) it.moved = x.moved;
+          if(typeof x.note==='string' && x.note.trim()) it.note = x.note.slice(0,500);
           return it;
         });
     }
   }
   if(typeof s.lastDate==='string' && /^\d{4}-\d{2}-\d{2}$/.test(s.lastDate)) out.lastDate = s.lastDate;
+  if(s.history && typeof s.history==='object'){
+    for(const [k,v] of Object.entries(s.history)){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(k) || !v || typeof v!=='object') continue;
+      const day = {};
+      for(const sec of SEC_KEYS) day[sec] = (Array.isArray(v[sec]) ? v[sec] : [])
+        .filter(x => x && typeof x.t==='string').map(x => ({t:x.t, d:!!x.d, n: typeof x.n==='string' ? x.n : ''}));
+      out.history[k] = day;
+    }
+  }
   return out;
 }
 function load(){
@@ -176,7 +231,7 @@ function load(){
   catch(e){ try { localStorage.setItem(KEY+'-broken-'+Date.now(), raw); } catch(_){} return emptyState(); }
 }
 let state = load();
-let ui = (() => { try { return JSON.parse(localStorage.getItem(UI_KEY)) || {open:{}}; } catch(e){ return {open:{}}; } })();
+let ui = (() => { try { const u = JSON.parse(localStorage.getItem(UI_KEY)) || {}; return {open: u.open||{}, days: u.days||{}}; } catch(e){ return {open:{}, days:{}}; } })();
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){ toast('Не удалось сохранить'); } }
 function saveUi(){ try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch(e){} }
 
@@ -211,18 +266,24 @@ function updateUndo(){
 
 /* ============ Смена дня ============
    Когда день недели прошёл:
-   • выдвижной список этого дня очищается;
+   • всё, что было в этот день, записывается в историю (с отметками и заметками);
+   • у обязательных дел снимаются галочки и заметки;
+   • выдвижной список очищается;
    • выполненные разовые дела удаляются, невыполненные переезжают на сегодня. */
 function rollover(){
   const t = today(), tk = dkey(t);
   if(!state.lastDate){ state.lastDate = tk; save(); return false; }
   if(state.lastDate >= tk) return false;
   let d = parseKey(state.lastDate);
-  if((t - d) / 864e5 > 7) d = addDays(t, -7);          // больше недели не заходили — достаточно одного круга
+  if((t - d) / 864e5 > 7) d = addDays(t, -7);
   const tw = wdi(t);
   let moved = 0;
   for(; d < t; d = addDays(d,1)){
-    const w = wdi(d);
+    const w = wdi(d), k = dkey(d);
+    const snap = {};
+    for(const sec of SEC_KEYS) snap[sec] = state[sec][w].map(x => ({t:x.text, d:!!x.done, n:x.note||''}));
+    if(SEC_KEYS.some(s => snap[s].length)) state.history[k] = snap;
+    state.req[w].forEach(x => { x.done = false; delete x.note; });
     state.temp[w] = [];
     const keep = state.once[w].filter(x => !x.done);
     state.once[w] = [];
@@ -231,11 +292,34 @@ function rollover(){
       state.once[tw].push(x); moved++;
     }
   }
+  const limit = dkey(addDays(t, -HISTORY_DAYS));
+  for(const k of Object.keys(state.history)) if(k < limit) delete state.history[k];
   state.lastDate = tk;
   save();
   undoStack = []; redoStack = []; updateUndo();
   if(moved) setTimeout(() => toast(`↪ Перенесено на сегодня: ${moved}`), 400);
   return true;
+}
+
+/* ============ Подсчёты ============ */
+const ordered = arr => arr.filter(x => !x.done).concat(arr.filter(x => x.done));   // выполненные — вниз
+function dayCount(w){
+  const all = [...state.req[w], ...state.once[w]];
+  return {done: all.filter(x => x.done).length, total: all.length};
+}
+function weekStats(){
+  const t = today(), mon = addDays(t, -wdi(t));
+  let done = 0, total = 0;
+  for(let i=0; i<7; i++){
+    const d = addDays(mon,i);
+    if(d < t){
+      const h = state.history[dkey(d)];
+      if(h) for(const s of ['req','once']) for(const x of h[s]){ total++; if(x.d) done++; }
+    } else {
+      const c = dayCount(wdi(d)); done += c.done; total += c.total;
+    }
+  }
+  return {done, total, mon, sun: addDays(mon,6)};
 }
 
 /* ============ Отрисовка ============ */
@@ -244,23 +328,41 @@ function itemHtml(it, w, sec){
     <div class="del-bg">Удалить</div>
     <div class="item-in">
       <button class="cb" data-act="toggle" aria-label="${it.done?'Снять отметку':'Отметить'}">${it.done?'✓':''}</button>
-      <span class="txt" data-act="edit">${esc(it.text)}${it.moved!==undefined && sec==='once' ? `<small class="moved">↪ перенесено с ${DAYS_GEN[it.moved]}</small>` : ''}</span>
+      <span class="txt" data-act="edit"><span class="tt">${esc(it.text)}</span>${
+        it.moved!==undefined && sec==='once' ? `<small class="moved">↪ перенесено с ${DAYS_GEN[it.moved]}</small>` : ''}${
+        it.note ? `<small class="note">📝 ${esc(it.note)}</small>` : ''}</span>
     </div></li>`;
 }
 function addHtml(w, sec){
   return `<div class="add"><span class="plus">+</span>
     <input type="text" data-add="${sec}" data-day="${w}" placeholder="${SECS[sec].ph}" enterkeyhint="done" autocomplete="off" maxlength="300"></div>`;
 }
+function isOpenDay(w, offset){ return offset===0 || !!ui.days[w]; }
 function dayHtml(w, date, offset){
   const label = offset===0 ? 'Сегодня' : offset===1 ? 'Завтра' : '';
-  const ds = `${label ? label+', ' : ''}${date.getDate()} ${MONTHS_GEN[date.getMonth()]}`;
+  const ds = `${label ? label+', ' : ''}${fmtDate(date)}`;
+  const c = dayCount(w);
+  const head = `<span class="dn">${DAYS[w]}</span><span class="dd">${ds}</span>
+    <span class="prog ${c.total && c.done===c.total ? 'full':''}" id="p-${w}">${c.total ? `${c.done} из ${c.total}` : ''}</span>`;
+  if(!isOpenDay(w, offset)){
+    const once = state.once[w].length, temp = state.temp[w].length;
+    const parts = [`${state.req[w].length} ${plural(state.req[w].length,'обязательное','обязательных','обязательных')}`];
+    if(once) parts.push(`${once} ${plural(once,'разовое','разовых','разовых')}`);
+    if(temp) parts.push(`${temp} в списке`);
+    return `<section class="day collapsed" data-day="${w}">
+      <button class="day-head" data-act="day-toggle" data-day="${w}">
+        <div style="flex:1;min-width:0"><div style="display:flex;align-items:baseline;gap:8px">${head}</div>
+        <div class="sum">${parts.join(' · ')}</div></div><span class="dchev">›</span></button></section>`;
+  }
   const open = !!ui.open[w];
   const sec = s => `<div class="sec" style="--sc:${SECS[s].color}">
       <div class="sec-head"><span>${SECS[s].title}</span>
         ${s==='req' ? `<button data-act="uncheck" data-day="${w}" id="un-${w}">Снять все</button>` : ''}</div>
       <ul class="items" id="l-${w}-${s}"></ul>${addHtml(w,s)}</div>`;
   return `<section class="day ${offset===0?'today':''}" data-day="${w}">
-    <div class="day-head"><span class="dn">${DAYS[w]}</span><span class="dd">${ds}</span></div>
+    ${offset===0 ? `<div class="day-head">${head}</div>`
+      : `<button class="day-head" data-act="day-toggle" data-day="${w}">${head}<span class="dchev">›</span></button>`}
+    ${offset===0 ? `<div class="bar"><i id="b-${w}" style="width:${c.total ? Math.round(c.done/c.total*100) : 0}%"></i></div>` : ''}
     ${sec('req')}${sec('once')}
     <div class="sec temp ${open?'open':''}" style="--sc:${SECS.temp.color}" id="t-${w}">
       <button class="temp-head" data-act="temp-toggle" data-day="${w}">
@@ -270,10 +372,21 @@ function dayHtml(w, date, offset){
     </div>
   </section>`;
 }
-function renderList(w, sec){
+function renderList(w, sec, animate=true){
   const ul = document.getElementById(`l-${w}-${sec}`);
   if(!ul) return;
-  ul.innerHTML = state[sec][w].map(it => itemHtml(it, w, sec)).join('');
+  const old = new Map();
+  if(animate) for(const li of ul.children) if(li.dataset.id) old.set(li.dataset.id, li.getBoundingClientRect().top);
+  ul.innerHTML = ordered(state[sec][w]).map(it => itemHtml(it, w, sec)).join('');
+  if(animate && old.size){
+    for(const li of ul.children){
+      const o = old.get(li.dataset.id); if(o===undefined) continue;
+      const dy = o - li.getBoundingClientRect().top;
+      if(Math.abs(dy) < 2) continue;
+      li.style.transition = 'none'; li.style.transform = `translateY(${dy}px)`;
+      requestAnimationFrame(() => requestAnimationFrame(() => { li.style.transition = 'transform .3s ease'; li.style.transform = ''; }));
+    }
+  }
   if(sec==='req'){
     const b = document.getElementById(`un-${w}`);
     if(b) b.classList.toggle('hidden', !state.req[w].some(x => x.done));
@@ -283,15 +396,27 @@ function renderList(w, sec){
     if(c){ c.textContent = n; c.classList.toggle('hidden', !n); }
   }
 }
+function renderMeta(){
+  for(let w=0; w<7; w++){
+    const c = dayCount(w), p = document.getElementById(`p-${w}`), b = document.getElementById(`b-${w}`);
+    if(p){ p.textContent = c.total ? `${c.done} из ${c.total}` : ''; p.classList.toggle('full', !!c.total && c.done===c.total); }
+    if(b) b.style.width = (c.total ? Math.round(c.done/c.total*100) : 0) + '%';
+  }
+  const s = weekStats();
+  document.getElementById('week').innerHTML = `
+    <div class="week-top">Неделя:<b>сделано ${s.done} из ${s.total}</b><span class="more">История ›</span></div>
+    <div class="bar"><i style="width:${s.total ? Math.round(s.done/s.total*100) : 0}%"></i></div>`;
+}
 function renderAll(){
   const t = today();
-  document.getElementById('todayLabel').textContent =
-    `${DAYS[wdi(t)].toLowerCase()}, ${t.getDate()} ${MONTHS_GEN[t.getMonth()]}`;
+  document.getElementById('todayLabel').textContent = `${DAYS[wdi(t)].toLowerCase()}, ${fmtDate(t)}`;
   let html = '';
   for(let i=0; i<7; i++){ const d = addDays(t,i); html += dayHtml(wdi(d), d, i); }
   document.getElementById('days').innerHTML = html;
-  for(let w=0; w<7; w++) for(const s of ['req','once','temp']) renderList(w, s);
+  for(let w=0; w<7; w++) for(const s of SEC_KEYS) renderList(w, s, false);
+  renderMeta();
 }
+function refresh(w, sec){ renderList(w, sec); renderMeta(); }
 
 /* ============ Поиск пункта ============ */
 function findItem(li){
@@ -307,7 +432,7 @@ function addFrom(input){
   const w = +input.dataset.day, sec = input.dataset.add;
   commit(() => state[sec][w].push({id: uid(), text, done:false}));
   input.value = '';
-  renderList(w, sec);
+  refresh(w, sec);
 }
 document.addEventListener('keydown', e => {
   const t = e.target;
@@ -318,45 +443,70 @@ document.addEventListener('focusout', e => {
   if(t.matches && t.matches('input[data-add]')) addFrom(t);
 });
 
-/* ============ Редактирование ============ */
+/* ============ Редактирование текста и заметки ============ */
 let editing = null;
 function startEdit(li){
   if(editing) finishEdit();
   const f = findItem(li); if(f.idx<0) return;
+  const it = f.arr[f.idx];
   const span = li.querySelector('.txt');
-  const inp = document.createElement('input');
-  inp.className = 'edit-in'; inp.value = f.arr[f.idx].text; inp.maxLength = 300; inp.enterKeyHint = 'done';
-  span.replaceWith(inp);
-  editing = {li, inp};
+  const box = document.createElement('div');
+  box.className = 'edit-box';
+  box.innerHTML = `<input class="edit-in" maxlength="300" enterkeyhint="next">
+    <input class="note-in" maxlength="500" enterkeyhint="done" placeholder="Заметка: например, заказал 20 ящиков">`;
+  const inp = box.querySelector('.edit-in'), note = box.querySelector('.note-in');
+  inp.value = it.text; note.value = it.note || '';
+  span.replaceWith(box);
+  editing = {li, box, inp, note};
   inp.focus();
-  const len = inp.value.length; try { inp.setSelectionRange(len,len); } catch(_){}
+  try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch(_){}
   inp.addEventListener('keydown', e => {
+    if(e.key==='Enter'){ e.preventDefault(); note.focus(); }
+    if(e.key==='Escape'){ e.preventDefault(); finishEdit(true); }
+  });
+  note.addEventListener('keydown', e => {
     if(e.key==='Enter'){ e.preventDefault(); finishEdit(); }
     if(e.key==='Escape'){ e.preventDefault(); finishEdit(true); }
   });
-  inp.addEventListener('blur', () => finishEdit());
+  box.addEventListener('focusout', () => setTimeout(() => {
+    if(editing && editing.box===box && !box.contains(document.activeElement)) finishEdit();
+  }, 0));
 }
 function finishEdit(cancelled=false){
   if(!editing) return;
-  const {li, inp} = editing;
+  const {li, inp, note} = editing;
   editing = null;
   const f = findItem(li);
-  const text = inp.value.trim();
+  const text = inp.value.trim(), nt = note.value.trim();
   if(!cancelled && f.idx>=0){
     if(!text){ commit(() => f.arr.splice(f.idx,1)); toast('Удалено', 'Отменить', undo); }
-    else commit(() => { f.arr[f.idx].text = text; });
+    else commit(() => {
+      const it = f.arr[f.idx];
+      it.text = text;
+      if(nt) it.note = nt; else delete it.note;
+    });
   }
-  renderList(f.w, f.sec);
+  refresh(f.w, f.sec);
 }
 
-/* ============ Удаление смахиванием ============ */
-let sw = null, blockClickUntil = 0;
-function swStart(li, x, y){ if(editing && editing.li===li) return; sw = {li, x, y, dx:0, active:false}; }
-function swMove(x, y, ev){
+/* ============ Смахивание (удаление) и перетаскивание ============ */
+let sw = null, lp = null, dg = null, blockClickUntil = 0;
+
+function pressStart(li, x, y){
+  if(editing && editing.li===li) return;
+  sw = {li, x, y, dx:0, active:false};
+  clearTimeout(lp && lp.timer);
+  lp = {li, x, y, timer: setTimeout(() => dragBegin(li, x, y), 450)};
+}
+function lpCancel(){ if(lp){ clearTimeout(lp.timer); lp = null; } }
+
+function pressMove(x, y, ev){
+  if(dg){ if(ev && ev.cancelable) ev.preventDefault(); dg.x = x; dg.y = y; dragMove(); return; }
+  if(lp && (Math.abs(x-lp.x) > 8 || Math.abs(y-lp.y) > 8)) lpCancel();
   if(!sw) return;
   const dx = x - sw.x, dy = y - sw.y;
   if(!sw.active){
-    if(dx < -10 && Math.abs(dx) > Math.abs(dy)*1.3){ sw.active = true; sw.li.classList.add('swiping'); }
+    if(dx < -10 && Math.abs(dx) > Math.abs(dy)*1.3){ sw.active = true; sw.li.classList.add('swiping'); lpCancel(); }
     else if(Math.abs(dy) > 10 || dx > 10){ sw = null; return; }
   }
   if(sw.active){
@@ -365,7 +515,9 @@ function swMove(x, y, ev){
     sw.li.querySelector('.item-in').style.transform = `translateX(${sw.dx}px)`;
   }
 }
-function swEnd(){
+function pressEnd(){
+  lpCancel();
+  if(dg){ dragEnd(); return; }
   if(!sw) return;
   const {li, dx, active} = sw;
   sw = null;
@@ -380,7 +532,7 @@ function swEnd(){
       setTimeout(() => {
         const f = findItem(li);
         if(f.idx>=0) commit(() => f.arr.splice(f.idx,1));
-        renderList(f.w, f.sec);
+        refresh(f.w, f.sec);
         toast('Удалено', 'Отменить', undo);
       }, 220);
     }, 160);
@@ -389,39 +541,119 @@ function swEnd(){
     setTimeout(() => li.classList.remove('swiping'), 200);
   }
 }
+
+function dragBegin(li, x, y){
+  lp = null; sw = null;
+  if(!li.isConnected) return;
+  const r = li.getBoundingClientRect();
+  const ghost = li.cloneNode(true);
+  ghost.classList.add('ghost');
+  ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;z-index:80;pointer-events:none;margin:0`;
+  document.body.appendChild(ghost);
+  const ph = document.createElement('li');
+  ph.className = 'ph'; ph.style.height = r.height + 'px';
+  li.after(ph);
+  li.classList.add('dragged');
+  dg = {li, ghost, ph, offY: y - r.top, x, y, target:null, src:{w:+li.dataset.day, sec:li.dataset.sec, id:li.dataset.id}};
+  if(navigator.vibrate) navigator.vibrate(15);
+  (function scrollLoop(){
+    if(!dg) return;
+    const edge = 90;
+    if(dg.y < edge + 60) window.scrollBy(0, -Math.ceil((edge+60-dg.y)/6));
+    else if(dg.y > innerHeight - edge) window.scrollBy(0, Math.ceil((dg.y-(innerHeight-edge))/6));
+    dragMove();
+    requestAnimationFrame(scrollLoop);
+  })();
+}
+function dragMove(){
+  if(!dg) return;
+  dg.ghost.style.top = (dg.y - dg.offY) + 'px';
+  document.querySelectorAll('.day.drop').forEach(d => d.classList.remove('drop'));
+  const el = document.elementFromPoint(Math.min(Math.max(dg.x, 20), innerWidth-20), dg.y);
+  if(!el) return;
+  const collapsed = el.closest('.day.collapsed');
+  if(collapsed){
+    collapsed.classList.add('drop');
+    dg.target = {w: +collapsed.dataset.day, sec: dg.src.sec};
+    if(dg.ph.isConnected) dg.ph.remove();
+    return;
+  }
+  let ul = el.closest('.items');
+  if(!ul){ const s = el.closest('.sec'); if(s) ul = s.querySelector('.items'); }
+  if(!ul || ul.closest('.hidden')) return;
+  dg.target = null;
+  const items = [...ul.querySelectorAll('.item:not(.dragged)')];
+  let before = null;
+  for(const it of items){ const rr = it.getBoundingClientRect(); if(dg.y < rr.top + rr.height/2){ before = it; break; } }
+  if(before){ if(dg.ph.nextSibling !== before || dg.ph.parentNode !== ul) ul.insertBefore(dg.ph, before); }
+  else if(ul.lastElementChild !== dg.ph) ul.appendChild(dg.ph);
+}
+function dragEnd(){
+  const d = dg; dg = null;
+  blockClickUntil = Date.now() + 400;
+  d.ghost.remove();
+  document.querySelectorAll('.day.drop').forEach(x => x.classList.remove('drop'));
+  let tw, tsec, idx = null;
+  if(d.target){ tw = d.target.w; tsec = d.target.sec; }
+  else if(d.ph.isConnected){
+    const ul = d.ph.parentNode, parts = ul.id.split('-');
+    tw = +parts[1]; tsec = parts[2];
+    idx = [...ul.children].filter(c => c===d.ph || (c.classList.contains('item') && !c.classList.contains('dragged'))).indexOf(d.ph);
+  }
+  d.ph.remove(); d.li.classList.remove('dragged');
+  if(tw===undefined) return;
+  const {w:sw0, sec:ss, id} = d.src;
+  commit(() => {
+    const src = state[ss][sw0], i = src.findIndex(x => x.id===id);
+    if(i<0) return;
+    const [it] = src.splice(i,1);
+    if(tsec!==ss || tw!==sw0) delete it.moved;
+    const list = ordered(state[tsec][tw]);
+    if(idx===null) idx = it.done ? list.length : list.filter(x => !x.done).length;
+    list.splice(Math.min(idx, list.length), 0, it);
+    state[tsec][tw] = list;
+  });
+  if(tw!==sw0 || tsec!==ss){
+    renderList(sw0, ss, false); renderList(tw, tsec, false); renderMeta();
+    if(!document.getElementById(`l-${tw}-${tsec}`)) renderAll();
+    toast(tw!==sw0 ? `Перенесено на ${DAYS_ACC[tw]}` : `Перенесено: ${SECS[tsec].title.toLowerCase()}`, 'Отменить', undo);
+  } else refresh(tw, tsec);
+}
+
 document.addEventListener('touchstart', e => {
   const li = e.target.closest('.item'); if(!li || e.target.closest('input')) return;
-  const t = e.touches[0]; swStart(li, t.clientX, t.clientY);
+  const t = e.touches[0]; pressStart(li, t.clientX, t.clientY);
 }, {passive:true});
-document.addEventListener('touchmove', e => { if(sw){ const t = e.touches[0]; swMove(t.clientX, t.clientY, e); } }, {passive:false});
-document.addEventListener('touchend', swEnd);
-document.addEventListener('touchcancel', swEnd);
+document.addEventListener('touchmove', e => { if(sw || lp || dg){ const t = e.touches[0]; pressMove(t.clientX, t.clientY, e); } }, {passive:false});
+document.addEventListener('touchend', pressEnd);
+document.addEventListener('touchcancel', pressEnd);
 document.addEventListener('mousedown', e => {
   const li = e.target.closest('.item'); if(!li || e.button!==0 || e.target.closest('input')) return;
-  swStart(li, e.clientX, e.clientY);
+  pressStart(li, e.clientX, e.clientY);
 });
-document.addEventListener('mousemove', e => swMove(e.clientX, e.clientY, null));
-document.addEventListener('mouseup', swEnd);
+document.addEventListener('mousemove', e => { if(sw || lp || dg) pressMove(e.clientX, e.clientY, null); });
+document.addEventListener('mouseup', pressEnd);
+document.addEventListener('contextmenu', e => { if(e.target.closest('.item')) e.preventDefault(); });
 
 /* ============ Нажатия ============ */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]');
   if(!t) return;
-  if(Date.now() < blockClickUntil) return;
+  if(Date.now() < blockClickUntil && t.closest('.item')) return;
   const a = t.dataset.act;
   const li = t.closest('.item');
   switch(a){
     case 'toggle': {
       const f = findItem(li); if(f.idx<0) break;
       commit(() => { f.arr[f.idx].done = !f.arr[f.idx].done; });
-      renderList(f.w, f.sec);
+      refresh(f.w, f.sec);
       break;
     }
     case 'edit': startEdit(li); break;
     case 'uncheck': {
       const w = +t.dataset.day;
       commit(() => state.req[w].forEach(x => x.done = false));
-      renderList(w, 'req');
+      refresh(w, 'req');
       break;
     }
     case 'temp-toggle': {
@@ -432,6 +664,13 @@ document.addEventListener('click', e => {
       box.querySelector('.temp-body').classList.toggle('hidden', !ui.open[w]);
       break;
     }
+    case 'day-toggle': {
+      const w = +t.dataset.day;
+      ui.days[w] = !ui.days[w]; saveUi();
+      renderAll();
+      break;
+    }
+    case 'history': historySheet(); break;
     case 'undo': undo(); break;
     case 'redo': redo(); break;
     case 'menu': menuSheet(); break;
@@ -439,8 +678,55 @@ document.addEventListener('click', e => {
     case 'sheet-close': closeSheet(); break;
     case 'export': exportData(); break;
     case 'import': document.getElementById('importInput').click(); break;
+    case 'imp-merge': {
+      if(!pendingImport) break;
+      const n = importMerge(pendingImport); pendingImport = null;
+      closeSheet(); renderAll(); toast(n ? `Добавлено дел: ${n}` : 'Всё это уже есть', n ? 'Отменить' : null, undo);
+      break;
+    }
+    case 'imp-replace':
+      if(!pendingImport) break;
+      importReplace(pendingImport); pendingImport = null;
+      closeSheet(); renderAll(); toast('Данные заменены', 'Отменить', undo);
+      break;
   }
 });
+
+/* ============ История ============ */
+function historySheet(){
+  const keys = Object.keys(state.history).sort().reverse();
+  const s = weekStats();
+  let html = `<h2>История</h2>
+    <p>Эта неделя (${fmtDate(s.mon)} – ${fmtDate(s.sun)}): сделано <b style="color:var(--text)">${s.done} из ${s.total}</b>.</p>`;
+  if(!keys.length){
+    html += `<p>Здесь появятся прошедшие дни: что было сделано, что нет, и ваши заметки. Первая запись — после окончания сегодняшнего дня.</p>`;
+  } else {
+    const weeks = new Map();
+    for(const k of keys){
+      const d = parseKey(k), mon = dkey(addDays(d, -wdi(d)));
+      if(!weeks.has(mon)) weeks.set(mon, []);
+      weeks.get(mon).push(k);
+    }
+    for(const [mon, days] of weeks){
+      let wd = 0, wt = 0;
+      for(const k of days) for(const sec of ['req','once']) for(const x of state.history[k][sec]){ wt++; if(x.d) wd++; }
+      const m = parseKey(mon);
+      html += `<div class="group-title"><span>${fmtDate(m)} – ${fmtDate(addDays(m,6))}</span><span>${wd} из ${wt}</span></div>`;
+      for(const k of days){
+        const h = state.history[k], d = parseKey(k);
+        const all = [...h.req, ...h.once], dn = all.filter(x => x.d).length;
+        const list = sec => h[sec].length ? `<div class="hsec" style="color:${SECS[sec].color}">${SECS[sec].title}</div>` +
+          h[sec].map(x => `<div class="hit ${x.d?'':'no'}"><span class="m" style="color:${x.d?'var(--ok)':'var(--danger)'}">${x.d?'✓':'✕'}</span>
+            <span>${esc(x.t)}${x.n ? `<small>📝 ${esc(x.n)}</small>` : ''}</span></div>`).join('') : '';
+        html += `<details class="hday"><summary>${DAYS[wdi(d)]}, ${fmtDate(d)}
+            <span class="${all.length && dn===all.length ? 'full':''}">${dn} из ${all.length}</span></summary>
+          <div class="hbody">${list('req')}${list('once')}${list('temp')}</div></details>`;
+      }
+    }
+    html += `<p style="font-size:13px">История хранится ${HISTORY_DAYS} дней.</p>`;
+  }
+  openSheet(html + `<button class="btn" data-act="sheet-close">Закрыть</button>`);
+}
 
 /* ============ Меню ============ */
 function openSheet(html){
@@ -452,16 +738,18 @@ function menuSheet(){
   openSheet(`<h2>Неделя</h2>
     <div class="group-title">Как пользоваться</div>
     <ul>
-      <li><b style="color:var(--req)">Обязательные</b> — повторяются каждую неделю. Галочки снимаются только вручную или кнопкой «Снять все».</li>
+      <li><b style="color:var(--req)">Обязательные</b> — повторяются каждую неделю. Когда день прошёл, галочки снимаются сами (отметки сохраняются в истории).</li>
       <li><b style="color:var(--once)">Разовые</b> — когда день прошёл, выполненные удаляются, а невыполненные переезжают на сегодня.</li>
       <li><b style="color:var(--temp)">Список на день</b> — очищается целиком, когда его день прошёл.</li>
-      <li>Нажмите на текст, чтобы исправить. Смахните влево, чтобы удалить.</li>
+      <li>Нажмите на текст, чтобы исправить его или добавить заметку.</li>
+      <li>Смахните влево, чтобы удалить. Удерживайте и тяните, чтобы переставить — можно в другой список или на другой день.</li>
+      <li>Нажмите на название дня, чтобы свернуть или развернуть его.</li>
       <li>↶ ↷ вверху — отменить и повторить действие.</li>
     </ul>
     <div class="group-title">Резервная копия</div>
     <p>Всё хранится только на этом телефоне. Сохраняйте копию в «Файлы» или iCloud.</p>
     <button class="btn primary" data-act="export">💾 Сохранить копию</button>
-    <button class="btn" data-act="import">📂 Восстановить из копии</button>
+    <button class="btn" data-act="import">📂 Загрузить из файла</button>
     <button class="btn" data-act="sheet-close">Закрыть</button>`);
 }
 async function exportData(){
@@ -476,16 +764,45 @@ async function exportData(){
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   toast('Копия сохранена');
 }
+let pendingImport = null;
 document.getElementById('importInput').addEventListener('change', async e => {
   const f = e.target.files && e.target.files[0]; e.target.value = '';
   if(!f) return;
-  try {
-    const data = normalize(JSON.parse(await f.text()));
-    if(!confirm('Восстановить копию? Текущие списки будут заменены.')) return;
-    commit(() => { state = data; });
-    rollover(); closeSheet(); renderAll(); toast('Данные восстановлены');
-  } catch(err){ toast('Это не файл резервной копии'); }
+  let data;
+  try { data = normalize(JSON.parse(await f.text())); }
+  catch(err){ toast('Это не файл резервной копии'); return; }
+  pendingImport = data;
+  const n = SEC_KEYS.reduce((s,sec) => s + Object.values(data[sec]).reduce((a,arr) => a + arr.length, 0), 0);
+  openSheet(`<h2>Загрузить из файла</h2>
+    <p>В файле ${n} ${plural(n,'дело','дела','дел')}.</p>
+    <button class="btn primary" data-act="imp-merge">➕ Добавить к моим делам</button>
+    <p style="font-size:13px;margin:6px 2px 0">Повторы пропускаются. Ваши дела останутся.</p>
+    <button class="btn" data-act="imp-replace">Заменить всё</button>
+    <button class="btn" data-act="sheet-close">Отмена</button>`);
 });
+function importMerge(data){
+  let added = 0;
+  commit(() => {
+    for(const sec of SEC_KEYS) for(let d=0; d<7; d++){
+      const have = new Set(state[sec][d].map(x => x.text.trim().toLowerCase()));
+      for(const it of data[sec][d]){
+        const k = it.text.trim().toLowerCase();
+        if(have.has(k)) continue;
+        have.add(k);
+        const n = {id: uid(), text: it.text, done: false};
+        if(it.note) n.note = it.note;
+        state[sec][d].push(n);
+        added++;
+      }
+    }
+    for(const [k,v] of Object.entries(data.history)) if(!state.history[k]) state.history[k] = v;
+  });
+  return added;
+}
+function importReplace(data){
+  const keepDate = state.lastDate;
+  commit(() => { state = data; state.lastDate = keepDate; });
+}
 
 /* ============ Сообщения ============ */
 let toastTimer = null;
@@ -501,9 +818,8 @@ function toast(text, btnText, onBtn){
 
 /* ============ Старт и смена дня ============ */
 function tick(){
-  if(editing || document.activeElement && document.activeElement.matches && document.activeElement.matches('input')) return;
-  const before = state.lastDate;
-  if(rollover() || before !== state.lastDate) renderAll();
+  if(editing || dg || (document.activeElement && document.activeElement.matches && document.activeElement.matches('input'))) return;
+  if(rollover()) renderAll(); else renderMeta();
 }
 document.addEventListener('visibilitychange', () => { if(document.visibilityState==='visible') tick(); });
 setInterval(tick, 60000);
