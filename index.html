@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Неделя</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Неделя">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<style>
+:root{
+  --bg:#F2F2F7; --card:#FFFFFF; --text:#1C1C1E; --muted:#8E8E93; --line:#E5E5EA;
+  --accent:#0A84FF; --today:#0A84FF; --danger:#FF3B30; --sheet:#FFFFFF; --field:#F2F2F7;
+  --req:#FF9500; --once:#34C759; --temp:#AF52DE;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#000; --card:#1C1C1E; --text:#F2F2F7; --line:#2C2C2E; --sheet:#1C1C1E; --field:#2C2C2E; --shadow:none; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text)}
+body{font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior-y:none}
+input{-webkit-user-select:text;user-select:text}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.hidden{display:none!important}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px calc(env(safe-area-inset-bottom) + 40px)}
+
+/* ---------- шапка ---------- */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;margin:0 -16px 6px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+.top .date{color:var(--muted);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+.top h1{margin:2px 0 0;font-size:32px;font-weight:800;letter-spacing:-.02em}
+.top-btns{display:flex;gap:6px}
+.icon-btn{width:40px;height:40px;border-radius:20px;background:var(--card);box-shadow:var(--shadow);
+  display:grid;place-items:center;font-size:21px;color:var(--accent);font-weight:600}
+.icon-btn:disabled{color:var(--muted);opacity:.45}
+.icon-btn:active:not(:disabled){transform:scale(.92)}
+
+/* ---------- карточка дня ---------- */
+.day{background:var(--card);border-radius:18px;padding:14px 14px 6px;margin-bottom:14px;box-shadow:var(--shadow)}
+.day.today{box-shadow:0 0 0 2px var(--today),var(--shadow)}
+.day-head{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.dn{font-size:22px;font-weight:800}
+.dd{font-size:14px;color:var(--muted);font-weight:500}
+.day.today .dd{color:var(--today);font-weight:700}
+.sec{margin-top:8px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.03em;color:var(--sc);margin:6px 0 2px}
+.sec-head button{font-size:13px;color:var(--accent);text-transform:none;letter-spacing:0;font-weight:600;padding:4px 0}
+
+/* ---------- пункты ---------- */
+.items{list-style:none;margin:0;padding:0}
+.item{position:relative;overflow:hidden;border-radius:10px}
+.del-bg{position:absolute;inset:0;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:flex-end;
+  padding-right:16px;font-size:15px;font-weight:600;opacity:0}
+.item.swiping .del-bg{opacity:1}
+.item-in{position:relative;display:flex;align-items:flex-start;gap:10px;padding:8px 2px;background:var(--card);transition:transform .2s}
+.item.swiping .item-in{transition:none}
+.item.removing{transition:max-height .22s,opacity .22s;max-height:0!important;opacity:0}
+.cb{width:24px;height:24px;border-radius:12px;border:2px solid var(--line);flex:none;margin-top:1px;display:grid;place-items:center;
+  color:#fff;font-size:14px;font-weight:800}
+.item.done .cb{background:var(--sc);border-color:var(--sc)}
+.txt{flex:1;min-width:0;word-break:break-word;padding-top:1px;min-height:24px}
+.item.done .txt{color:var(--muted);text-decoration:line-through}
+.moved{display:block;font-size:12px;color:var(--danger);text-decoration:none;font-weight:500}
+.edit-in,.add input{width:100%;border:0;outline:none;background:transparent;color:var(--text);font:inherit;font-size:17px;padding:0}
+.add{display:flex;align-items:center;gap:10px;padding:8px 2px;color:var(--muted)}
+.add .plus{width:24px;height:24px;border-radius:12px;display:grid;place-items:center;font-size:20px;color:var(--sc);flex:none}
+.add input::placeholder{color:var(--muted)}
+
+/* ---------- выдвижной список ---------- */
+.temp{border-top:1px solid var(--line);margin-top:6px}
+.temp-head{display:flex;align-items:center;gap:8px;width:100%;padding:10px 2px;text-align:left;color:var(--sc);font-weight:600;font-size:15px}
+.chev{display:inline-block;transition:transform .2s;font-size:18px;width:14px}
+.temp.open .chev{transform:rotate(90deg)}
+.count{background:var(--sc);color:#fff;border-radius:10px;padding:0 7px;font-size:12px;font-weight:700;min-width:20px;text-align:center}
+.temp-head small{margin-left:auto;color:var(--muted);font-weight:400;font-size:12px}
+
+/* ---------- панель снизу и сообщения ---------- */
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.sheet{background:var(--sheet);width:100%;max-width:560px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;
+  padding:8px 18px calc(env(safe-area-inset-bottom) + 18px);animation:up .25s ease}
+@keyframes up{from{transform:translateY(100%)}}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 10px}
+.sheet h2{font-size:20px;margin:4px 0 12px}
+.sheet p,.sheet li{color:var(--muted);font-size:15px}
+.sheet ul{padding-left:20px;margin:6px 0 10px}
+.btn{display:block;width:100%;padding:15px;border-radius:14px;font-weight:700;font-size:17px;text-align:center;margin-top:10px;background:var(--field)}
+.btn.primary{background:var(--accent);color:#fff}
+.group-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;margin:18px 2px 6px}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 20px);transform:translate(-50%,20px);
+  background:rgba(30,30,30,.94);color:#fff;padding:10px 12px 10px 18px;border-radius:22px;font-size:15px;z-index:100;
+  opacity:0;transition:.25s;pointer-events:none;display:flex;align-items:center;gap:12px;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.toast button{color:#64D2FF;font-weight:700;padding:4px 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="date" id="todayLabel"></div>
+      <h1>Неделя</h1>
+    </div>
+    <div class="top-btns">
+      <button class="icon-btn" id="undoBtn" data-act="undo" aria-label="Отменить" disabled>↶</button>
+      <button class="icon-btn" id="redoBtn" data-act="redo" aria-label="Повторить" disabled>↷</button>
+      <button class="icon-btn" data-act="menu" aria-label="Меню">•••</button>
+    </div>
+  </header>
+  <div id="days"></div>
+</div>
+<div id="sheetRoot"></div>
+<input type="file" id="importInput" accept="application/json,.json" class="hidden">
+<div class="toast" id="toast"><span id="toastText"></span><button id="toastBtn" class="hidden"></button></div>
+
+<script>
+'use strict';
+/* ============ Константы и даты ============ */
+const KEY = 'nedelya-v1', UI_KEY = 'nedelya-ui';
+const DAYS = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
+const DAYS_GEN = ['понедельника','вторника','среды','четверга','пятницы','субботы','воскресенья'];
+const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const SECS = {
+  req:  {title:'Обязательные', ph:'Добавить обязательное дело', color:'var(--req)'},
+  once: {title:'Разовые дела', ph:'Добавить разовое дело',      color:'var(--once)'},
+  temp: {title:'Список на день', ph:'Добавить в список',         color:'var(--temp)'}
+};
+const pad = n => String(n).padStart(2,'0');
+const dkey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseKey = k => { const [y,m,d] = k.split('-').map(Number); return new Date(y,m-1,d); };
+const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
+const today = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); };
+const wdi = d => (d.getDay()+6)%7;   // 0 = понедельник
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+
+/* ============ Данные ============ */
+function emptyState(){
+  const w = () => ({0:[],1:[],2:[],3:[],4:[],5:[],6:[]});
+  return {version:1, req:w(), once:w(), temp:w(), lastDate:null};
+}
+function normalize(s){
+  if(!s || typeof s!=='object') throw new Error('bad');
+  const out = emptyState();
+  for(const sec of ['req','once','temp']){
+    if(!s[sec] || typeof s[sec]!=='object') continue;
+    for(let d=0; d<7; d++){
+      const arr = Array.isArray(s[sec][d]) ? s[sec][d] : [];
+      out[sec][d] = arr.filter(x => x && typeof x.text==='string' && x.text.trim())
+        .map(x => {
+          const it = {id: typeof x.id==='string' ? x.id : uid(), text: x.text.slice(0,300), done: !!x.done};
+          if(Number.isInteger(x.moved) && x.moved>=0 && x.moved<7) it.moved = x.moved;
+          return it;
+        });
+    }
+  }
+  if(typeof s.lastDate==='string' && /^\d{4}-\d{2}-\d{2}$/.test(s.lastDate)) out.lastDate = s.lastDate;
+  return out;
+}
+function load(){
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch(e){ return emptyState(); }
+  if(!raw) return emptyState();
+  try { return normalize(JSON.parse(raw)); }
+  catch(e){ try { localStorage.setItem(KEY+'-broken-'+Date.now(), raw); } catch(_){} return emptyState(); }
+}
+let state = load();
+let ui = (() => { try { return JSON.parse(localStorage.getItem(UI_KEY)) || {open:{}}; } catch(e){ return {open:{}}; } })();
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){ toast('Не удалось сохранить'); } }
+function saveUi(){ try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch(e){} }
+
+/* ============ Отмена / повтор ============ */
+let undoStack = [], redoStack = [];
+function commit(mutate){
+  const before = JSON.stringify(state);
+  mutate();
+  if(JSON.stringify(state) === before) return false;
+  undoStack.push(before);
+  if(undoStack.length > 100) undoStack.shift();
+  redoStack = [];
+  save(); updateUndo();
+  return true;
+}
+function undo(){
+  if(!undoStack.length) return;
+  redoStack.push(JSON.stringify(state));
+  state = JSON.parse(undoStack.pop());
+  save(); renderAll(); updateUndo(); toast('Отменено');
+}
+function redo(){
+  if(!redoStack.length) return;
+  undoStack.push(JSON.stringify(state));
+  state = JSON.parse(redoStack.pop());
+  save(); renderAll(); updateUndo(); toast('Повторено');
+}
+function updateUndo(){
+  document.getElementById('undoBtn').disabled = !undoStack.length;
+  document.getElementById('redoBtn').disabled = !redoStack.length;
+}
+
+/* ============ Смена дня ============
+   Когда день недели прошёл:
+   • выдвижной список этого дня очищается;
+   • выполненные разовые дела удаляются, невыполненные переезжают на сегодня. */
+function rollover(){
+  const t = today(), tk = dkey(t);
+  if(!state.lastDate){ state.lastDate = tk; save(); return false; }
+  if(state.lastDate >= tk) return false;
+  let d = parseKey(state.lastDate);
+  if((t - d) / 864e5 > 7) d = addDays(t, -7);          // больше недели не заходили — достаточно одного круга
+  const tw = wdi(t);
+  let moved = 0;
+  for(; d < t; d = addDays(d,1)){
+    const w = wdi(d);
+    state.temp[w] = [];
+    const keep = state.once[w].filter(x => !x.done);
+    state.once[w] = [];
+    for(const x of keep){
+      if(w !== tw && x.moved === undefined) x.moved = w;
+      state.once[tw].push(x); moved++;
+    }
+  }
+  state.lastDate = tk;
+  save();
+  undoStack = []; redoStack = []; updateUndo();
+  if(moved) setTimeout(() => toast(`↪ Перенесено на сегодня: ${moved}`), 400);
+  return true;
+}
+
+/* ============ Отрисовка ============ */
+function itemHtml(it, w, sec){
+  return `<li class="item ${it.done?'done':''}" data-id="${it.id}" data-day="${w}" data-sec="${sec}">
+    <div class="del-bg">Удалить</div>
+    <div class="item-in">
+      <button class="cb" data-act="toggle" aria-label="${it.done?'Снять отметку':'Отметить'}">${it.done?'✓':''}</button>
+      <span class="txt" data-act="edit">${esc(it.text)}${it.moved!==undefined && sec==='once' ? `<small class="moved">↪ перенесено с ${DAYS_GEN[it.moved]}</small>` : ''}</span>
+    </div></li>`;
+}
+function addHtml(w, sec){
+  return `<div class="add"><span class="plus">+</span>
+    <input type="text" data-add="${sec}" data-day="${w}" placeholder="${SECS[sec].ph}" enterkeyhint="done" autocomplete="off" maxlength="300"></div>`;
+}
+function dayHtml(w, date, offset){
+  const label = offset===0 ? 'Сегодня' : offset===1 ? 'Завтра' : '';
+  const ds = `${label ? label+', ' : ''}${date.getDate()} ${MONTHS_GEN[date.getMonth()]}`;
+  const open = !!ui.open[w];
+  const sec = s => `<div class="sec" style="--sc:${SECS[s].color}">
+      <div class="sec-head"><span>${SECS[s].title}</span>
+        ${s==='req' ? `<button data-act="uncheck" data-day="${w}" id="un-${w}">Снять все</button>` : ''}</div>
+      <ul class="items" id="l-${w}-${s}"></ul>${addHtml(w,s)}</div>`;
+  return `<section class="day ${offset===0?'today':''}" data-day="${w}">
+    <div class="day-head"><span class="dn">${DAYS[w]}</span><span class="dd">${ds}</span></div>
+    ${sec('req')}${sec('once')}
+    <div class="sec temp ${open?'open':''}" style="--sc:${SECS.temp.color}" id="t-${w}">
+      <button class="temp-head" data-act="temp-toggle" data-day="${w}">
+        <span class="chev">›</span>${SECS.temp.title}<span class="count" id="c-${w}"></span>
+        <small>${offset===0 ? 'очистится в полночь' : 'очистится после ' + DAYS_GEN[w]}</small></button>
+      <div class="temp-body ${open?'':'hidden'}"><ul class="items" id="l-${w}-temp"></ul>${addHtml(w,'temp')}</div>
+    </div>
+  </section>`;
+}
+function renderList(w, sec){
+  const ul = document.getElementById(`l-${w}-${sec}`);
+  if(!ul) return;
+  ul.innerHTML = state[sec][w].map(it => itemHtml(it, w, sec)).join('');
+  if(sec==='req'){
+    const b = document.getElementById(`un-${w}`);
+    if(b) b.classList.toggle('hidden', !state.req[w].some(x => x.done));
+  }
+  if(sec==='temp'){
+    const c = document.getElementById(`c-${w}`), n = state.temp[w].length;
+    if(c){ c.textContent = n; c.classList.toggle('hidden', !n); }
+  }
+}
+function renderAll(){
+  const t = today();
+  document.getElementById('todayLabel').textContent =
+    `${DAYS[wdi(t)].toLowerCase()}, ${t.getDate()} ${MONTHS_GEN[t.getMonth()]}`;
+  let html = '';
+  for(let i=0; i<7; i++){ const d = addDays(t,i); html += dayHtml(wdi(d), d, i); }
+  document.getElementById('days').innerHTML = html;
+  for(let w=0; w<7; w++) for(const s of ['req','once','temp']) renderList(w, s);
+}
+
+/* ============ Поиск пункта ============ */
+function findItem(li){
+  const w = +li.dataset.day, sec = li.dataset.sec, id = li.dataset.id;
+  const arr = state[sec][w];
+  return {w, sec, arr, idx: arr.findIndex(x => x.id===id)};
+}
+
+/* ============ Добавление ============ */
+function addFrom(input){
+  const text = input.value.trim();
+  if(!text) return;
+  const w = +input.dataset.day, sec = input.dataset.add;
+  commit(() => state[sec][w].push({id: uid(), text, done:false}));
+  input.value = '';
+  renderList(w, sec);
+}
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if(t.matches && t.matches('input[data-add]') && e.key==='Enter'){ e.preventDefault(); addFrom(t); }
+});
+document.addEventListener('focusout', e => {
+  const t = e.target;
+  if(t.matches && t.matches('input[data-add]')) addFrom(t);
+});
+
+/* ============ Редактирование ============ */
+let editing = null;
+function startEdit(li){
+  if(editing) finishEdit();
+  const f = findItem(li); if(f.idx<0) return;
+  const span = li.querySelector('.txt');
+  const inp = document.createElement('input');
+  inp.className = 'edit-in'; inp.value = f.arr[f.idx].text; inp.maxLength = 300; inp.enterKeyHint = 'done';
+  span.replaceWith(inp);
+  editing = {li, inp};
+  inp.focus();
+  const len = inp.value.length; try { inp.setSelectionRange(len,len); } catch(_){}
+  inp.addEventListener('keydown', e => {
+    if(e.key==='Enter'){ e.preventDefault(); finishEdit(); }
+    if(e.key==='Escape'){ e.preventDefault(); finishEdit(true); }
+  });
+  inp.addEventListener('blur', () => finishEdit());
+}
+function finishEdit(cancelled=false){
+  if(!editing) return;
+  const {li, inp} = editing;
+  editing = null;
+  const f = findItem(li);
+  const text = inp.value.trim();
+  if(!cancelled && f.idx>=0){
+    if(!text){ commit(() => f.arr.splice(f.idx,1)); toast('Удалено', 'Отменить', undo); }
+    else commit(() => { f.arr[f.idx].text = text; });
+  }
+  renderList(f.w, f.sec);
+}
+
+/* ============ Удаление смахиванием ============ */
+let sw = null, blockClickUntil = 0;
+function swStart(li, x, y){ if(editing && editing.li===li) return; sw = {li, x, y, dx:0, active:false}; }
+function swMove(x, y, ev){
+  if(!sw) return;
+  const dx = x - sw.x, dy = y - sw.y;
+  if(!sw.active){
+    if(dx < -10 && Math.abs(dx) > Math.abs(dy)*1.3){ sw.active = true; sw.li.classList.add('swiping'); }
+    else if(Math.abs(dy) > 10 || dx > 10){ sw = null; return; }
+  }
+  if(sw.active){
+    if(ev && ev.cancelable) ev.preventDefault();
+    sw.dx = Math.min(0, dx);
+    sw.li.querySelector('.item-in').style.transform = `translateX(${sw.dx}px)`;
+  }
+}
+function swEnd(){
+  if(!sw) return;
+  const {li, dx, active} = sw;
+  sw = null;
+  if(!active) return;
+  blockClickUntil = Date.now() + 350;
+  const inner = li.querySelector('.item-in');
+  if(dx < -90){
+    inner.style.transition = 'transform .18s'; inner.style.transform = 'translateX(-110%)';
+    li.style.maxHeight = li.offsetHeight + 'px';
+    setTimeout(() => {
+      li.classList.add('removing');
+      setTimeout(() => {
+        const f = findItem(li);
+        if(f.idx>=0) commit(() => f.arr.splice(f.idx,1));
+        renderList(f.w, f.sec);
+        toast('Удалено', 'Отменить', undo);
+      }, 220);
+    }, 160);
+  } else {
+    inner.style.transform = '';
+    setTimeout(() => li.classList.remove('swiping'), 200);
+  }
+}
+document.addEventListener('touchstart', e => {
+  const li = e.target.closest('.item'); if(!li || e.target.closest('input')) return;
+  const t = e.touches[0]; swStart(li, t.clientX, t.clientY);
+}, {passive:true});
+document.addEventListener('touchmove', e => { if(sw){ const t = e.touches[0]; swMove(t.clientX, t.clientY, e); } }, {passive:false});
+document.addEventListener('touchend', swEnd);
+document.addEventListener('touchcancel', swEnd);
+document.addEventListener('mousedown', e => {
+  const li = e.target.closest('.item'); if(!li || e.button!==0 || e.target.closest('input')) return;
+  swStart(li, e.clientX, e.clientY);
+});
+document.addEventListener('mousemove', e => swMove(e.clientX, e.clientY, null));
+document.addEventListener('mouseup', swEnd);
+
+/* ============ Нажатия ============ */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]');
+  if(!t) return;
+  if(Date.now() < blockClickUntil) return;
+  const a = t.dataset.act;
+  const li = t.closest('.item');
+  switch(a){
+    case 'toggle': {
+      const f = findItem(li); if(f.idx<0) break;
+      commit(() => { f.arr[f.idx].done = !f.arr[f.idx].done; });
+      renderList(f.w, f.sec);
+      break;
+    }
+    case 'edit': startEdit(li); break;
+    case 'uncheck': {
+      const w = +t.dataset.day;
+      commit(() => state.req[w].forEach(x => x.done = false));
+      renderList(w, 'req');
+      break;
+    }
+    case 'temp-toggle': {
+      const w = +t.dataset.day;
+      ui.open[w] = !ui.open[w]; saveUi();
+      const box = document.getElementById(`t-${w}`);
+      box.classList.toggle('open', ui.open[w]);
+      box.querySelector('.temp-body').classList.toggle('hidden', !ui.open[w]);
+      break;
+    }
+    case 'undo': undo(); break;
+    case 'redo': redo(); break;
+    case 'menu': menuSheet(); break;
+    case 'sheet-bg': if(e.target===t) closeSheet(); break;
+    case 'sheet-close': closeSheet(); break;
+    case 'export': exportData(); break;
+    case 'import': document.getElementById('importInput').click(); break;
+  }
+});
+
+/* ============ Меню ============ */
+function openSheet(html){
+  document.getElementById('sheetRoot').innerHTML =
+    `<div class="backdrop" data-act="sheet-bg"><div class="sheet"><div class="grab"></div>${html}</div></div>`;
+}
+function closeSheet(){ document.getElementById('sheetRoot').innerHTML = ''; }
+function menuSheet(){
+  openSheet(`<h2>Неделя</h2>
+    <div class="group-title">Как пользоваться</div>
+    <ul>
+      <li><b style="color:var(--req)">Обязательные</b> — повторяются каждую неделю. Галочки снимаются только вручную или кнопкой «Снять все».</li>
+      <li><b style="color:var(--once)">Разовые</b> — когда день прошёл, выполненные удаляются, а невыполненные переезжают на сегодня.</li>
+      <li><b style="color:var(--temp)">Список на день</b> — очищается целиком, когда его день прошёл.</li>
+      <li>Нажмите на текст, чтобы исправить. Смахните влево, чтобы удалить.</li>
+      <li>↶ ↷ вверху — отменить и повторить действие.</li>
+    </ul>
+    <div class="group-title">Резервная копия</div>
+    <p>Всё хранится только на этом телефоне. Сохраняйте копию в «Файлы» или iCloud.</p>
+    <button class="btn primary" data-act="export">💾 Сохранить копию</button>
+    <button class="btn" data-act="import">📂 Восстановить из копии</button>
+    <button class="btn" data-act="sheet-close">Закрыть</button>`);
+}
+async function exportData(){
+  const json = JSON.stringify(state, null, 2), name = `nedelya-${dkey(today())}.json`;
+  let file = null; try { file = new File([json], name, {type:'application/json'}); } catch(e){}
+  if(file && navigator.canShare && navigator.canShare({files:[file]})){
+    try { await navigator.share({files:[file], title:'Неделя — резервная копия'}); return; }
+    catch(e){ if(e && e.name==='AbortError') return; }
+  }
+  const url = URL.createObjectURL(new Blob([json], {type:'application/json'}));
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast('Копия сохранена');
+}
+document.getElementById('importInput').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = '';
+  if(!f) return;
+  try {
+    const data = normalize(JSON.parse(await f.text()));
+    if(!confirm('Восстановить копию? Текущие списки будут заменены.')) return;
+    commit(() => { state = data; });
+    rollover(); closeSheet(); renderAll(); toast('Данные восстановлены');
+  } catch(err){ toast('Это не файл резервной копии'); }
+});
+
+/* ============ Сообщения ============ */
+let toastTimer = null;
+function toast(text, btnText, onBtn){
+  const el = document.getElementById('toast'), b = document.getElementById('toastBtn');
+  document.getElementById('toastText').textContent = text;
+  if(btnText){ b.textContent = btnText; b.classList.remove('hidden'); b.onclick = () => { el.classList.remove('show'); onBtn(); }; }
+  else { b.classList.add('hidden'); b.onclick = null; }
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), btnText ? 4000 : 1600);
+}
+
+/* ============ Старт и смена дня ============ */
+function tick(){
+  if(editing || document.activeElement && document.activeElement.matches && document.activeElement.matches('input')) return;
+  const before = state.lastDate;
+  if(rollover() || before !== state.lastDate) renderAll();
+}
+document.addEventListener('visibilitychange', () => { if(document.visibilityState==='visible') tick(); });
+setInterval(tick, 60000);
+
+if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1')){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+
+rollover();
+renderAll();
+updateUndo();
+</script>
+</body>
+</html>
