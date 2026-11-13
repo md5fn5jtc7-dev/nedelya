@@ -555,7 +555,7 @@ function startEdit(li){
     <button class="btn" data-act="sheet-close">Отмена</button>`);
   const inp = document.getElementById('eText');
   inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); saveEdit(); } });
-  try { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } catch(_){}
+  try { inp.focus({preventScroll:true}); inp.setSelectionRange(inp.value.length, inp.value.length); } catch(_){}
 }
 function editFind(){
   if(!editing) return null;
@@ -870,11 +870,33 @@ function historySheet(){
 }
 
 /* ============ Меню ============ */
+// Пока открыта панель, страница под ней «заморожена» на месте: не прокручивается
+// и не уезжает вниз, когда появляется клавиатура. После закрытия — то же место.
+let lockY = null;
+function lockScroll(){
+  if(lockY !== null) return;
+  lockY = window.scrollY;
+  const b = document.body.style;
+  b.position = 'fixed'; b.top = `-${lockY}px`; b.left = '0'; b.right = '0'; b.width = '100%';
+}
+function unlockScroll(){
+  if(lockY === null) return;
+  const y = lockY; lockY = null;
+  const b = document.body.style;
+  b.position = ''; b.top = ''; b.left = ''; b.right = ''; b.width = '';
+  window.scrollTo(0, y);
+  setTimeout(() => window.scrollTo(0, y), 60);   // iPhone иногда сдвигает страницу, когда прячет клавиатуру
+}
 function openSheet(html){
+  lockScroll();
   document.getElementById('sheetRoot').innerHTML =
     `<div class="backdrop" data-act="sheet-bg"><div class="sheet"><div class="grab"></div>${html}</div></div>`;
 }
-function closeSheet(){ document.getElementById('sheetRoot').innerHTML = ''; }
+function closeSheet(){
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  document.getElementById('sheetRoot').innerHTML = '';
+  unlockScroll();
+}
 function menuSheet(){
   openSheet(`<h2>Неделя</h2>
     <div class="group-title">Как пользоваться</div>
@@ -893,7 +915,7 @@ function menuSheet(){
     <button class="btn primary" data-act="export">💾 Сохранить копию</button>
     <button class="btn" data-act="import">📂 Загрузить из файла</button>
     <button class="btn" data-act="sheet-close">Закрыть</button>
-    <p style="font-size:12px;text-align:center;margin-top:12px">Версия 6</p>`);
+    <p style="font-size:12px;text-align:center;margin-top:12px">Версия 7</p>`);
 }
 async function exportData(){
   const json = JSON.stringify(state, null, 2), name = `nedelya-${dkey(today())}.json`;
