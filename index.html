@@ -27,7 +27,11 @@
 html,body{margin:0;background:var(--bg);color:var(--text)}
 body{font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;
   touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior-y:none}
-input{-webkit-user-select:text;user-select:text}
+input,textarea{-webkit-user-select:text;user-select:text}
+.field{display:block;width:100%;font:inherit;font-size:17px;padding:12px 14px;border-radius:12px;border:0;background:var(--field);color:var(--text);outline:none;margin-bottom:6px}
+textarea.field{resize:vertical;font-size:16px;line-height:1.35}
+.lbl{font-size:13px;font-weight:600;color:var(--muted);margin:8px 2px 4px}
+.btn.red{color:var(--danger)}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 /* Safari на iPhone не передаёт нажатия на обычный текст без cursor:pointer */
 [data-act],.txt,.item{cursor:pointer}
@@ -534,56 +538,57 @@ document.addEventListener('focusout', e => {
 });
 
 /* ============ Редактирование текста и заметки ============ */
-let editing = null;
+// Правка открывается в нижней панели: она не закрывается сама, даже если iPhone
+// не поставил курсор в поле автоматически — тогда достаточно коснуться поля.
+let editing = null;   // {sec, w, id}
 function startEdit(li){
-  if(editing) finishEdit();
   const f = findItem(li); if(f.idx<0) return;
   const it = f.arr[f.idx];
-  const span = li.querySelector('.txt');
-  const box = document.createElement('div');
-  box.className = 'edit-box';
-  box.innerHTML = `<input class="edit-in" maxlength="300" enterkeyhint="next">
-    <input class="note-in" maxlength="500" enterkeyhint="done" placeholder="Заметка: например, заказал 20 ящиков">`;
-  const inp = box.querySelector('.edit-in'), note = box.querySelector('.note-in');
-  inp.value = it.text; note.value = it.note || '';
-  span.replaceWith(box);
-  editing = {li, box, inp, note};
-  inp.focus();
-  try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch(_){}
-  inp.addEventListener('keydown', e => {
-    if(e.key==='Enter'){ e.preventDefault(); note.focus(); }
-    if(e.key==='Escape'){ e.preventDefault(); finishEdit(true); }
-  });
-  note.addEventListener('keydown', e => {
-    if(e.key==='Enter'){ e.preventDefault(); finishEdit(); }
-    if(e.key==='Escape'){ e.preventDefault(); finishEdit(true); }
-  });
-  box.addEventListener('focusout', () => setTimeout(() => {
-    if(editing && editing.box===box && !box.contains(document.activeElement)) finishEdit();
-  }, 0));
+  editing = {sec: f.sec, w: f.w, id: it.id};
+  openSheet(`<h2>Изменить</h2>
+    <div class="lbl">Текст</div>
+    <input class="field" id="eText" maxlength="300" enterkeyhint="done" autocomplete="off" value="${esc(it.text)}">
+    <div class="lbl">Заметка</div>
+    <textarea class="field" id="eNote" rows="3" maxlength="500" placeholder="Например: заказал 20 ящиков, привезут в 14:00">${esc(it.note || '')}</textarea>
+    <button class="btn primary" data-act="e-save">Сохранить</button>
+    <button class="btn red" data-act="e-del">Удалить</button>
+    <button class="btn" data-act="sheet-close">Отмена</button>`);
+  const inp = document.getElementById('eText');
+  inp.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); saveEdit(); } });
+  try { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } catch(_){}
 }
-function finishEdit(cancelled=false){
-  if(!editing) return;
-  const {li, inp, note} = editing;
-  editing = null;
-  const f = findItem(li);
-  const text = inp.value.trim(), nt = note.value.trim();
-  if(!cancelled && f.idx>=0){
-    if(!text){ commit(() => f.arr.splice(f.idx,1)); toast('Удалено', 'Отменить', undo); }
-    else commit(() => {
-      const it = f.arr[f.idx];
-      it.text = text;
-      if(nt) it.note = nt; else delete it.note;
-    });
-  }
+function editFind(){
+  if(!editing) return null;
+  const arr = arrOf(editing.sec, editing.w), idx = arr.findIndex(x => x.id===editing.id);
+  return idx < 0 ? null : {arr, idx, w: editing.w, sec: editing.sec};
+}
+function saveEdit(){
+  const f = editFind();
+  const text = (document.getElementById('eText')?.value || '').trim();
+  const nt = (document.getElementById('eNote')?.value || '').trim();
+  editing = null; closeSheet();
+  if(!f) return;
+  if(!text){ commit(() => f.arr.splice(f.idx,1)); toast('Удалено', 'Отменить', undo); }
+  else commit(() => {
+    const it = f.arr[f.idx];
+    it.text = text;
+    if(nt) it.note = nt; else delete it.note;
+  });
   refresh(f.w, f.sec);
+}
+function deleteEdit(){
+  const f = editFind();
+  editing = null; closeSheet();
+  if(!f) return;
+  commit(() => f.arr.splice(f.idx,1));
+  refresh(f.w, f.sec);
+  toast('Удалено', 'Отменить', undo);
 }
 
 /* ============ Смахивание (удаление) и перетаскивание ============ */
 let sw = null, lp = null, dg = null, blockClickUntil = 0;
 
 function pressStart(li, x, y){
-  if(editing && editing.li===li) return;
   sw = {li, x, y, dx:0, active:false};
   clearTimeout(lp && lp.timer);
   lp = {li, x, y, timer: setTimeout(() => dragBegin(li, x, y), 450)};
@@ -808,8 +813,10 @@ document.addEventListener('click', e => {
     case 'undo': undo(); break;
     case 'redo': redo(); break;
     case 'menu': menuSheet(); break;
-    case 'sheet-bg': if(e.target===t) closeSheet(); break;
-    case 'sheet-close': closeSheet(); break;
+    case 'sheet-bg': if(e.target===t){ editing = null; closeSheet(); } break;
+    case 'sheet-close': editing = null; closeSheet(); break;
+    case 'e-save': saveEdit(); break;
+    case 'e-del': deleteEdit(); break;
     case 'export': exportData(); break;
     case 'import': document.getElementById('importInput').click(); break;
     case 'imp-merge': {
@@ -886,7 +893,7 @@ function menuSheet(){
     <button class="btn primary" data-act="export">💾 Сохранить копию</button>
     <button class="btn" data-act="import">📂 Загрузить из файла</button>
     <button class="btn" data-act="sheet-close">Закрыть</button>
-    <p style="font-size:12px;text-align:center;margin-top:12px">Версия 5</p>`);
+    <p style="font-size:12px;text-align:center;margin-top:12px">Версия 6</p>`);
 }
 async function exportData(){
   const json = JSON.stringify(state, null, 2), name = `nedelya-${dkey(today())}.json`;
