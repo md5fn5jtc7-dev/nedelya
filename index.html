@@ -139,7 +139,8 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 /* ---------- панель снизу и сообщения ---------- */
 .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
 @keyframes fade{from{opacity:0}}
-.sheet{background:var(--sheet);width:100%;max-width:560px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;
+.sheet{background:var(--sheet);width:100%;max-width:560px;max-height:calc(100% - 24px);overflow-y:auto;border-radius:20px 20px 0 0;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   padding:8px 18px calc(env(safe-area-inset-bottom) + 18px);animation:up .25s ease}
 @keyframes up{from{transform:translateY(100%)}}
 .grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 10px}
@@ -891,7 +892,31 @@ function openSheet(html){
   lockScroll();
   document.getElementById('sheetRoot').innerHTML =
     `<div class="backdrop" data-act="sheet-bg"><div class="sheet"><div class="grab"></div>${html}</div></div>`;
+  fitSheet();
 }
+// Панель всегда прижата к низу ВИДИМОЙ части экрана: когда выезжает клавиатура,
+// iPhone сдвигает видимую область — панель встаёт ровно над клавиатурой и не прыгает.
+function fitSheet(){
+  const bd = document.querySelector('.backdrop'), vv = window.visualViewport;
+  if(!bd || !vv) return;
+  bd.style.top = vv.offsetTop + 'px';
+  bd.style.height = vv.height + 'px';
+  bd.style.bottom = 'auto';
+}
+if(window.visualViewport){
+  visualViewport.addEventListener('resize', fitSheet);
+  visualViewport.addEventListener('scroll', fitSheet);
+}
+// Пока панель открыта, палец не тянет ни панель, ни страницу под ней.
+// Прокручивать можно только саму панель, если она не помещается, и текст заметки.
+document.addEventListener('touchmove', e => {
+  if(lockY === null || dg) return;
+  const t = e.target;
+  if(t.closest && t.closest('textarea')) return;
+  const sh = t.closest && t.closest('.sheet');
+  if(sh && sh.scrollHeight > sh.clientHeight + 1) return;
+  if(e.cancelable) e.preventDefault();
+}, {passive:false});
 function closeSheet(){
   if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
   document.getElementById('sheetRoot').innerHTML = '';
@@ -915,7 +940,7 @@ function menuSheet(){
     <button class="btn primary" data-act="export">💾 Сохранить копию</button>
     <button class="btn" data-act="import">📂 Загрузить из файла</button>
     <button class="btn" data-act="sheet-close">Закрыть</button>
-    <p style="font-size:12px;text-align:center;margin-top:12px">Версия 7</p>`);
+    <p style="font-size:12px;text-align:center;margin-top:12px">Версия 8</p>`);
 }
 async function exportData(){
   const json = JSON.stringify(state, null, 2), name = `nedelya-${dkey(today())}.json`;
