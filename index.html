@@ -86,6 +86,11 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .del-bg{position:absolute;inset:0;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:flex-end;
   padding-right:16px;font-size:15px;font-weight:600;opacity:0}
 .item.swiping .del-bg{opacity:1}
+.edit-bg{position:absolute;inset:0;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:flex-start;
+  padding-left:16px;font-size:15px;font-weight:600;opacity:0}
+.item.swiping-r .edit-bg{opacity:1}
+.item.swiping-r .del-bg{opacity:0}
+.item.swiping-r .item-in{transition:none}
 .item-in{position:relative;display:flex;align-items:flex-start;gap:10px;padding:8px 2px;background:var(--card);transition:transform .2s}
 .item.swiping .item-in{transition:none}
 .item.removing{transition:max-height .22s,opacity .22s;max-height:0!important;opacity:0}
@@ -362,7 +367,7 @@ function weekStats(){
 /* ============ Отрисовка ============ */
 function itemHtml(it, w, sec){
   return `<li class="item ${it.done?'done':''}" data-id="${it.id}" data-day="${w}" data-sec="${sec}">
-    <div class="del-bg">Удалить</div>
+    <div class="edit-bg">✎ Изменить</div><div class="del-bg">Удалить</div>
     <div class="item-in">
       <button class="cb" data-act="toggle" aria-label="${it.done?'Снять отметку':'Отметить'}">${it.done?'✓':''}</button>
       <span class="txt" data-act="edit"><span class="tt">${esc(it.text)}</span>${
@@ -499,6 +504,15 @@ function findItem(li){
   return {w, sec, arr, idx: arr.findIndex(x => x.id===id)};
 }
 
+function itemAct(a, li){
+  if(!li || !li.isConnected) return;
+  if(a==='toggle'){
+    const f = findItem(li); if(f.idx<0) return;
+    commit(() => { f.arr[f.idx].done = !f.arr[f.idx].done; });
+    refresh(f.w, f.sec);
+  } else if(a==='edit') startEdit(li);
+}
+
 /* ============ Добавление ============ */
 function addFrom(input){
   const text = input.value.trim();
@@ -582,24 +596,34 @@ function pressMove(x, y, ev){
   if(!sw) return;
   const dx = x - sw.x, dy = y - sw.y;
   if(!sw.active){
-    if(dx < -10 && Math.abs(dx) > Math.abs(dy)*1.3){ sw.active = true; sw.li.classList.add('swiping'); lpCancel(); }
-    else if(Math.abs(dy) > 10 || dx > 10){ sw = null; return; }
+    if(Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)*1.3){
+      sw.active = true; sw.dir = dx < 0 ? 'l' : 'r';
+      sw.li.classList.add(sw.dir==='l' ? 'swiping' : 'swiping-r'); lpCancel();
+    }
+    else if(Math.abs(dy) > 10){ sw = null; return; }
   }
   if(sw.active){
     if(ev && ev.cancelable) ev.preventDefault();
-    sw.dx = Math.min(0, dx);
+    sw.dx = sw.dir==='l' ? Math.min(0, dx) : Math.max(0, Math.min(dx, 110));
     sw.li.querySelector('.item-in').style.transform = `translateX(${sw.dx}px)`;
   }
 }
+// возвращает true, если жест открыл правку (смахивание вправо)
 function pressEnd(){
   lpCancel();
-  if(dg){ dragEnd(); return; }
-  if(!sw) return;
-  const {li, dx, active} = sw;
+  if(dg){ dragEnd(); return false; }
+  if(!sw) return false;
+  const {li, dx, active, dir} = sw;
   sw = null;
-  if(!active) return;
+  if(!active) return false;
   blockClickUntil = Date.now() + 350;
   const inner = li.querySelector('.item-in');
+  if(dir==='r'){
+    inner.style.transition = 'transform .2s'; inner.style.transform = '';
+    setTimeout(() => { li.classList.remove('swiping-r'); inner.style.transition = ''; }, 200);
+    if(dx > 70){ startEdit(li); return true; }
+    return false;
+  }
   if(dx < -90){
     inner.style.transition = 'transform .18s'; inner.style.transform = 'translateX(-110%)';
     li.style.maxHeight = li.offsetHeight + 'px';
@@ -713,13 +737,32 @@ function dragEnd(){
 // iPhone после касания присылает ещё и «мышиные» события — их пропускаем
 let lastTouch = 0;
 document.addEventListener('touchstart', () => { lastTouch = Date.now(); }, {passive:true, capture:true});
+// Касание дела обрабатываем сами, в момент отрыва пальца — не дожидаясь «клика» Safari.
+let tap = null;
 document.addEventListener('touchstart', e => {
-  const li = e.target.closest('.item'); if(!li || e.target.closest('input')) return;
-  const t = e.touches[0]; pressStart(li, t.clientX, t.clientY);
+  const li = e.target.closest('.item'); if(!li || e.target.closest('input')) { tap = null; return; }
+  const t = e.touches[0];
+  tap = {x: t.clientX, y: t.clientY, time: Date.now(), target: e.target};
+  pressStart(li, t.clientX, t.clientY);
 }, {passive:true});
-document.addEventListener('touchmove', e => { if(sw || lp || dg){ const t = e.touches[0]; pressMove(t.clientX, t.clientY, e); } }, {passive:false});
-document.addEventListener('touchend', pressEnd);
-document.addEventListener('touchcancel', pressEnd);
+document.addEventListener('touchmove', e => {
+  const t = e.touches[0];
+  if(tap && (Math.abs(t.clientX-tap.x) > 10 || Math.abs(t.clientY-tap.y) > 10)) tap = null;
+  if(sw || lp || dg) pressMove(t.clientX, t.clientY, e);
+}, {passive:false});
+document.addEventListener('touchend', e => {
+  const wasTap = tap && !dg && !(sw && sw.active) && Date.now() - tap.time < 450;
+  const target = tap && tap.target;
+  tap = null;
+  if(pressEnd()){ if(e.cancelable) e.preventDefault(); return; }    // смахивание вправо открыло правку
+  if(!wasTap || !target || !target.isConnected) return;
+  const actEl = target.closest('[data-act]'), li = target.closest('.item');
+  if(!actEl || !li || !['toggle','edit'].includes(actEl.dataset.act)) return;
+  if(e.cancelable) e.preventDefault();                                // «клик» после этого не придёт
+  blockClickUntil = Date.now() + 700;
+  itemAct(actEl.dataset.act, li);
+}, {passive:false});
+document.addEventListener('touchcancel', () => { tap = null; pressEnd(); });
 const fromTouch = () => Date.now() - lastTouch < 1000;
 document.addEventListener('mousedown', e => {
   if(fromTouch()) return;
@@ -738,13 +781,8 @@ document.addEventListener('click', e => {
   const a = t.dataset.act;
   const li = t.closest('.item');
   switch(a){
-    case 'toggle': {
-      const f = findItem(li); if(f.idx<0) break;
-      commit(() => { f.arr[f.idx].done = !f.arr[f.idx].done; });
-      refresh(f.w, f.sec);
-      break;
-    }
-    case 'edit': startEdit(li); break;
+    case 'toggle':
+    case 'edit': itemAct(a, li); break;
     case 'uncheck': {
       const w = +t.dataset.day;
       commit(() => state.req[w].forEach(x => x.done = false));
@@ -838,7 +876,7 @@ function menuSheet(){
       <li><b style="color:var(--once)">Разовые</b> — когда день прошёл, выполненные удаляются, а невыполненные переезжают на сегодня.</li>
       <li><b style="color:var(--temp)">Список на день</b> — по разделам (Напитки, Пиво, Бакалея…). Когда день прошёл, отмеченное удаляется, а неотмеченное переезжает в <b style="color:var(--danger)">🛒 Нужно заказать</b> — в тот же раздел.</li>
       <li><b style="color:var(--danger)">Нужно заказать</b> — отметьте заказанное, и оно исчезнет в полночь.</li>
-      <li>Нажмите на текст, чтобы исправить его или добавить заметку.</li>
+      <li>Нажмите на текст или смахните дело вправо, чтобы исправить его или добавить заметку.</li>
       <li>Смахните влево, чтобы удалить. Удерживайте и тяните, чтобы переставить — можно в другой список или на другой день.</li>
       <li>Нажмите на название дня, чтобы свернуть или развернуть его.</li>
       <li>↶ ↷ вверху — отменить и повторить действие.</li>
@@ -847,7 +885,8 @@ function menuSheet(){
     <p>Всё хранится только на этом телефоне. Сохраняйте копию в «Файлы» или iCloud.</p>
     <button class="btn primary" data-act="export">💾 Сохранить копию</button>
     <button class="btn" data-act="import">📂 Загрузить из файла</button>
-    <button class="btn" data-act="sheet-close">Закрыть</button>`);
+    <button class="btn" data-act="sheet-close">Закрыть</button>
+    <p style="font-size:12px;text-align:center;margin-top:12px">Версия 5</p>`);
 }
 async function exportData(){
   const json = JSON.stringify(state, null, 2), name = `nedelya-${dkey(today())}.json`;
