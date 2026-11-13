@@ -203,7 +203,7 @@ const SECS = {
   temp: {title:'Список на день', ph:'Добавить в список',         color:'var(--temp)'}
 };
 const SEC_KEYS = ['req','once','temp'];
-const CATS = ['Напитки','Алкоголь','Пиво','Бакалея','Крупы','Бытовая','Остальное'];
+const CATS = ['Напитки','Алкоголь','Пиво','Бакалея','Крупы','Морозилка','Бытовая','Остальное'];
 const OTHER = 'Остальное';
 const normCat = c => CATS.includes(c) ? c : OTHER;
 const HISTORY_DAYS = 120;
@@ -940,7 +940,7 @@ function menuSheet(){
     <button class="btn primary" data-act="export">💾 Сохранить копию</button>
     <button class="btn" data-act="import">📂 Загрузить из файла</button>
     <button class="btn" data-act="sheet-close">Закрыть</button>
-    <p style="font-size:12px;text-align:center;margin-top:12px">Версия 8</p>`);
+    <p style="font-size:12px;text-align:center;margin-top:12px">Версия 9</p>`);
 }
 async function exportData(){
   const json = JSON.stringify(state, null, 2), name = `nedelya-${dkey(today())}.json`;
