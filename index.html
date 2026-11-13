@@ -29,6 +29,8 @@ body{font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Ne
   touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior-y:none}
 input{-webkit-user-select:text;user-select:text}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+/* Safari на iPhone не передаёт нажатия на обычный текст без cursor:pointer */
+[data-act],.txt,.item{cursor:pointer}
 .hidden{display:none!important}
 .wrap{max-width:560px;margin:0 auto;padding:0 16px calc(env(safe-area-inset-bottom) + 40px)}
 
@@ -109,6 +111,21 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .temp.open .chev{transform:rotate(90deg)}
 .count{background:var(--sc);color:#fff;border-radius:10px;padding:0 7px;font-size:12px;font-weight:700;min-width:20px;text-align:center}
 .temp-head small{margin-left:auto;color:var(--muted);font-weight:400;font-size:12px}
+.cat{margin:0 0 4px}
+.cat-head{font-size:13px;font-weight:700;color:var(--text);margin:8px 0 0;display:flex;justify-content:space-between}
+.cat-head span{color:var(--muted);font-weight:600}
+.cat .add{padding:5px 2px}
+.cat .add input{font-size:16px}
+
+/* ---------- нужно заказать ---------- */
+.order{background:var(--card);border-radius:18px;padding:12px 14px 6px;margin-bottom:12px;box-shadow:0 0 0 2px var(--danger),var(--shadow);--sc:var(--danger)}
+.order-head{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding-bottom:6px}
+.order-head .t{font-size:20px;font-weight:800}
+.order-head .count{background:var(--danger)}
+.order-head .dchev{margin-left:auto}
+.order.closed .dchev{transform:none}
+.order:not(.closed) .dchev{transform:rotate(90deg)}
+.order .hint{font-size:12px;color:var(--muted);margin:2px 0 6px}
 
 /* ---------- панель снизу и сообщения ---------- */
 .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
@@ -155,6 +172,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
     </div>
   </header>
   <button class="week" data-act="history" id="week"></button>
+  <div id="order"></div>
   <div id="days"></div>
 </div>
 <div id="sheetRoot"></div>
@@ -175,6 +193,9 @@ const SECS = {
   temp: {title:'Список на день', ph:'Добавить в список',         color:'var(--temp)'}
 };
 const SEC_KEYS = ['req','once','temp'];
+const CATS = ['Напитки','Алкоголь','Пиво','Бакалея','Крупы','Бытовая','Остальное'];
+const OTHER = 'Остальное';
+const normCat = c => CATS.includes(c) ? c : OTHER;
 const HISTORY_DAYS = 120;
 const pad = n => String(n).padStart(2,'0');
 const dkey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -193,24 +214,26 @@ const fmtDate = d => `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
 /* ============ Данные ============ */
 function emptyState(){
   const w = () => ({0:[],1:[],2:[],3:[],4:[],5:[],6:[]});
-  return {version:2, req:w(), once:w(), temp:w(), lastDate:null, history:{}};
+  return {version:3, req:w(), once:w(), temp:w(), order:[], lastDate:null, history:{}};
+}
+function normItems(arr, withCat){
+  return (Array.isArray(arr) ? arr : []).filter(x => x && typeof x.text==='string' && x.text.trim())
+    .map(x => {
+      const it = {id: typeof x.id==='string' ? x.id : uid(), text: x.text.slice(0,300), done: !!x.done};
+      if(Number.isInteger(x.moved) && x.moved>=0 && x.moved<7) it.moved = x.moved;
+      if(typeof x.note==='string' && x.note.trim()) it.note = x.note.slice(0,500);
+      if(withCat) it.cat = normCat(x.cat);
+      return it;
+    });
 }
 function normalize(s){
   if(!s || typeof s!=='object') throw new Error('bad');
   const out = emptyState();
   for(const sec of SEC_KEYS){
     if(!s[sec] || typeof s[sec]!=='object') continue;
-    for(let d=0; d<7; d++){
-      const arr = Array.isArray(s[sec][d]) ? s[sec][d] : [];
-      out[sec][d] = arr.filter(x => x && typeof x.text==='string' && x.text.trim())
-        .map(x => {
-          const it = {id: typeof x.id==='string' ? x.id : uid(), text: x.text.slice(0,300), done: !!x.done};
-          if(Number.isInteger(x.moved) && x.moved>=0 && x.moved<7) it.moved = x.moved;
-          if(typeof x.note==='string' && x.note.trim()) it.note = x.note.slice(0,500);
-          return it;
-        });
-    }
+    for(let d=0; d<7; d++) out[sec][d] = normItems(s[sec][d], sec==='temp');
   }
+  out.order = normItems(s.order, true);
   if(typeof s.lastDate==='string' && /^\d{4}-\d{2}-\d{2}$/.test(s.lastDate)) out.lastDate = s.lastDate;
   if(s.history && typeof s.history==='object'){
     for(const [k,v] of Object.entries(s.history)){
@@ -231,7 +254,7 @@ function load(){
   catch(e){ try { localStorage.setItem(KEY+'-broken-'+Date.now(), raw); } catch(_){} return emptyState(); }
 }
 let state = load();
-let ui = (() => { try { const u = JSON.parse(localStorage.getItem(UI_KEY)) || {}; return {open: u.open||{}, days: u.days||{}}; } catch(e){ return {open:{}, days:{}}; } })();
+let ui = (() => { try { const u = JSON.parse(localStorage.getItem(UI_KEY)) || {}; return {open: u.open||{}, days: u.days||{}, orderClosed: !!u.orderClosed}; } catch(e){ return {open:{}, days:{}, orderClosed:false}; } })();
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){ toast('Не удалось сохранить'); } }
 function saveUi(){ try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch(e){} }
 
@@ -277,13 +300,26 @@ function rollover(){
   let d = parseKey(state.lastDate);
   if((t - d) / 864e5 > 7) d = addDays(t, -7);
   const tw = wdi(t);
-  let moved = 0;
+  let moved = 0, toOrder = 0;
+  // заказанное (отмеченное) в «Нужно заказать» удаляется ночью
+  state.order = state.order.filter(x => !x.done);
   for(; d < t; d = addDays(d,1)){
     const w = wdi(d), k = dkey(d);
     const snap = {};
     for(const sec of SEC_KEYS) snap[sec] = state[sec][w].map(x => ({t:x.text, d:!!x.done, n:x.note||''}));
     if(SEC_KEYS.some(s => snap[s].length)) state.history[k] = snap;
     state.req[w].forEach(x => { x.done = false; delete x.note; });
+    // неотмеченное из списка на день → «Нужно заказать» (по разделам, без повторов)
+    const have = new Set(state.order.map(x => normCat(x.cat) + '|' + x.text.trim().toLowerCase()));
+    for(const x of state.temp[w]){
+      if(x.done) continue;
+      const key = normCat(x.cat) + '|' + x.text.trim().toLowerCase();
+      if(have.has(key)) continue;
+      have.add(key);
+      const it = {id: uid(), text: x.text, done: false, cat: normCat(x.cat)};
+      if(x.note) it.note = x.note;
+      state.order.push(it); toOrder++;
+    }
     state.temp[w] = [];
     const keep = state.once[w].filter(x => !x.done);
     state.once[w] = [];
@@ -297,7 +333,8 @@ function rollover(){
   state.lastDate = tk;
   save();
   undoStack = []; redoStack = []; updateUndo();
-  if(moved) setTimeout(() => toast(`↪ Перенесено на сегодня: ${moved}`), 400);
+  const msg = [moved ? `↪ На сегодня: ${moved}` : '', toOrder ? `🛒 В «Нужно заказать»: ${toOrder}` : ''].filter(Boolean).join(' · ');
+  if(msg) setTimeout(() => toast(msg), 400);
   return true;
 }
 
@@ -333,10 +370,14 @@ function itemHtml(it, w, sec){
         it.note ? `<small class="note">📝 ${esc(it.note)}</small>` : ''}</span>
     </div></li>`;
 }
-function addHtml(w, sec){
+function addHtml(w, sec, ci){
+  const ph = ci!==undefined ? 'Добавить' : SECS[sec].ph;
   return `<div class="add"><span class="plus">+</span>
-    <input type="text" data-add="${sec}" data-day="${w}" placeholder="${SECS[sec].ph}" enterkeyhint="done" autocomplete="off" maxlength="300"></div>`;
+    <input type="text" data-add="${sec}" data-day="${w}" ${ci!==undefined ? `data-cat="${ci}"` : ''} placeholder="${ph}" enterkeyhint="done" autocomplete="off" maxlength="300"></div>`;
 }
+const arrOf = (sec, w) => sec==='order' ? state.order : state[sec][w];
+function setArr(sec, w, list){ if(sec==='order') state.order = list; else state[sec][w] = list; }
+const catList = (sec, w, cat) => ordered(arrOf(sec,w).filter(x => normCat(x.cat)===cat));
 function isOpenDay(w, offset){ return offset===0 || !!ui.days[w]; }
 function dayHtml(w, date, offset){
   const label = offset===0 ? 'Сегодня' : offset===1 ? 'Завтра' : '';
@@ -368,16 +409,56 @@ function dayHtml(w, date, offset){
       <button class="temp-head" data-act="temp-toggle" data-day="${w}">
         <span class="chev">›</span>${SECS.temp.title}<span class="count" id="c-${w}"></span>
         <small>${offset===0 ? 'очистится в полночь' : 'очистится после ' + DAYS_GEN[w]}</small></button>
-      <div class="temp-body ${open?'':'hidden'}"><ul class="items" id="l-${w}-temp"></ul>${addHtml(w,'temp')}</div>
+      <div class="temp-body ${open?'':'hidden'}">${CATS.map((c,ci) => `<div class="cat">
+        <div class="cat-head">${c}<span id="cc-${w}-${ci}"></span></div>
+        <ul class="items" id="l-${w}-temp-${ci}"></ul>${addHtml(w,'temp',ci)}</div>`).join('')}
+        <p class="sum" style="margin:6px 2px 8px">Что не отмечено к концу дня — переедет в 🛒 «Нужно заказать».</p></div>
     </div>
   </section>`;
 }
 function renderList(w, sec, animate=true){
-  const ul = document.getElementById(`l-${w}-${sec}`);
+  if(sec==='order'){ renderOrder(); return; }
+  if(sec==='temp'){
+    CATS.forEach((c,ci) => {
+      const list = catList('temp', w, c);
+      renderUl(document.getElementById(`l-${w}-temp-${ci}`), list, w, sec, animate);
+      const cc = document.getElementById(`cc-${w}-${ci}`);
+      if(cc) cc.textContent = list.length ? list.length : '';
+    });
+  } else renderUl(document.getElementById(`l-${w}-${sec}`), ordered(state[sec][w]), w, sec, animate);
+  if(sec==='req'){
+    const b = document.getElementById(`un-${w}`);
+    if(b) b.classList.toggle('hidden', !state.req[w].some(x => x.done));
+  }
+  if(sec==='temp'){
+    const c = document.getElementById(`c-${w}`), n = state.temp[w].length;
+    if(c){ c.textContent = n; c.classList.toggle('hidden', !n); }
+  }
+}
+function renderOrder(){
+  const box = document.getElementById('order');
+  const n = state.order.length;
+  if(!n){ box.innerHTML = ''; return; }
+  const left = state.order.filter(x => !x.done).length;
+  const closed = ui.orderClosed;
+  box.innerHTML = `<div class="order ${closed?'closed':''}">
+    <button class="order-head" data-act="order-toggle"><span class="t">🛒 Нужно заказать</span>
+      <span class="count">${left}</span><span class="dchev">›</span></button>
+    ${closed ? '' : `<div class="hint">Отмеченное (заказанное) исчезнет в полночь.</div>` +
+      CATS.map((c,ci) => state.order.some(x => normCat(x.cat)===c)
+        ? `<div class="cat"><div class="cat-head">${c}<span>${catList('order','o',c).filter(x=>!x.done).length || ''}</span></div>
+           <ul class="items" id="l-o-order-${ci}"></ul></div>` : '').join('')}
+  </div>`;
+  if(!closed) CATS.forEach((c,ci) => {
+    const ul = document.getElementById(`l-o-order-${ci}`);
+    if(ul) renderUl(ul, catList('order','o',c), 'o', 'order', false);
+  });
+}
+function renderUl(ul, list, w, sec, animate){
   if(!ul) return;
   const old = new Map();
   if(animate) for(const li of ul.children) if(li.dataset.id) old.set(li.dataset.id, li.getBoundingClientRect().top);
-  ul.innerHTML = ordered(state[sec][w]).map(it => itemHtml(it, w, sec)).join('');
+  ul.innerHTML = list.map(it => itemHtml(it, w, sec)).join('');
   if(animate && old.size){
     for(const li of ul.children){
       const o = old.get(li.dataset.id); if(o===undefined) continue;
@@ -386,14 +467,6 @@ function renderList(w, sec, animate=true){
       li.style.transition = 'none'; li.style.transform = `translateY(${dy}px)`;
       requestAnimationFrame(() => requestAnimationFrame(() => { li.style.transition = 'transform .3s ease'; li.style.transform = ''; }));
     }
-  }
-  if(sec==='req'){
-    const b = document.getElementById(`un-${w}`);
-    if(b) b.classList.toggle('hidden', !state.req[w].some(x => x.done));
-  }
-  if(sec==='temp'){
-    const c = document.getElementById(`c-${w}`), n = state.temp[w].length;
-    if(c){ c.textContent = n; c.classList.toggle('hidden', !n); }
   }
 }
 function renderMeta(){
@@ -414,14 +487,15 @@ function renderAll(){
   for(let i=0; i<7; i++){ const d = addDays(t,i); html += dayHtml(wdi(d), d, i); }
   document.getElementById('days').innerHTML = html;
   for(let w=0; w<7; w++) for(const s of SEC_KEYS) renderList(w, s, false);
+  renderOrder();
   renderMeta();
 }
 function refresh(w, sec){ renderList(w, sec); renderMeta(); }
 
 /* ============ Поиск пункта ============ */
 function findItem(li){
-  const w = +li.dataset.day, sec = li.dataset.sec, id = li.dataset.id;
-  const arr = state[sec][w];
+  const sec = li.dataset.sec, w = sec==='order' ? 'o' : +li.dataset.day, id = li.dataset.id;
+  const arr = arrOf(sec, w);
   return {w, sec, arr, idx: arr.findIndex(x => x.id===id)};
 }
 
@@ -430,7 +504,9 @@ function addFrom(input){
   const text = input.value.trim();
   if(!text) return;
   const w = +input.dataset.day, sec = input.dataset.add;
-  commit(() => state[sec][w].push({id: uid(), text, done:false}));
+  const it = {id: uid(), text, done:false};
+  if(input.dataset.cat !== undefined) it.cat = CATS[+input.dataset.cat] || OTHER;
+  commit(() => state[sec][w].push(it));
   input.value = '';
   refresh(w, sec);
 }
@@ -574,7 +650,7 @@ function dragMove(){
   const collapsed = el.closest('.day.collapsed');
   if(collapsed){
     collapsed.classList.add('drop');
-    dg.target = {w: +collapsed.dataset.day, sec: dg.src.sec};
+    dg.target = {w: +collapsed.dataset.day, sec: dg.src.sec==='order' ? 'temp' : dg.src.sec};
     if(dg.ph.isConnected) dg.ph.remove();
     return;
   }
@@ -593,33 +669,50 @@ function dragEnd(){
   blockClickUntil = Date.now() + 400;
   d.ghost.remove();
   document.querySelectorAll('.day.drop').forEach(x => x.classList.remove('drop'));
-  let tw, tsec, idx = null;
+  let tw, tsec, tcat = null, idx = null;
   if(d.target){ tw = d.target.w; tsec = d.target.sec; }
   else if(d.ph.isConnected){
-    const ul = d.ph.parentNode, parts = ul.id.split('-');
-    tw = +parts[1]; tsec = parts[2];
+    const ul = d.ph.parentNode, parts = ul.id.split('-');          // l-<день>-<список>[-<раздел>]
+    tw = parts[1]==='o' ? 'o' : +parts[1]; tsec = parts[2];
+    if(parts[3] !== undefined) tcat = CATS[+parts[3]];
     idx = [...ul.children].filter(c => c===d.ph || (c.classList.contains('item') && !c.classList.contains('dragged'))).indexOf(d.ph);
   }
   d.ph.remove(); d.li.classList.remove('dragged');
   if(tw===undefined) return;
-  const {w:sw0, sec:ss, id} = d.src;
+  const {sec:ss, id} = d.src, sw0 = ss==='order' ? 'o' : d.src.w;
+  let srcCat = null;
   commit(() => {
-    const src = state[ss][sw0], i = src.findIndex(x => x.id===id);
+    const src = arrOf(ss, sw0), i = src.findIndex(x => x.id===id);
     if(i<0) return;
     const [it] = src.splice(i,1);
+    srcCat = it.cat !== undefined ? normCat(it.cat) : null;
     if(tsec!==ss || tw!==sw0) delete it.moved;
-    const list = ordered(state[tsec][tw]);
+    const all = arrOf(tsec, tw);
+    let list, rest;
+    if(tsec==='temp' || tsec==='order'){
+      it.cat = tcat || normCat(it.cat);
+      list = ordered(all.filter(x => normCat(x.cat)===it.cat));
+      rest = all.filter(x => normCat(x.cat)!==it.cat);
+    } else { list = ordered(all); rest = []; }
     if(idx===null) idx = it.done ? list.length : list.filter(x => !x.done).length;
     list.splice(Math.min(idx, list.length), 0, it);
-    state[tsec][tw] = list;
+    setArr(tsec, tw, rest.concat(list));
   });
-  if(tw!==sw0 || tsec!==ss){
-    renderList(sw0, ss, false); renderList(tw, tsec, false); renderMeta();
-    if(!document.getElementById(`l-${tw}-${tsec}`)) renderAll();
-    toast(tw!==sw0 ? `Перенесено на ${DAYS_ACC[tw]}` : `Перенесено: ${SECS[tsec].title.toLowerCase()}`, 'Отменить', undo);
-  } else refresh(tw, tsec);
+  const sameList = tw===sw0 && tsec===ss && (tcat===null || tcat===srcCat);
+  renderList(sw0, ss, sameList); renderList(tw, tsec, sameList); renderMeta();
+  if(tw!=='o' && tsec!=='order' && !document.querySelector(`[id^="l-${tw}-${tsec}"]`)) renderAll();
+  if(!sameList){
+    const where = (tcat && tw===sw0 && tsec===ss) ? `в раздел «${tcat}»`
+      : tsec==='order' ? '🛒 в «Нужно заказать»'
+      : tw!==sw0 ? `на ${DAYS_ACC[tw]}`
+      : tcat ? `в раздел «${tcat}»` : `в «${SECS[tsec].title.toLowerCase()}»`;
+    toast(`Перенесено ${where}`, 'Отменить', undo);
+  }
 }
 
+// iPhone после касания присылает ещё и «мышиные» события — их пропускаем
+let lastTouch = 0;
+document.addEventListener('touchstart', () => { lastTouch = Date.now(); }, {passive:true, capture:true});
 document.addEventListener('touchstart', e => {
   const li = e.target.closest('.item'); if(!li || e.target.closest('input')) return;
   const t = e.touches[0]; pressStart(li, t.clientX, t.clientY);
@@ -627,12 +720,14 @@ document.addEventListener('touchstart', e => {
 document.addEventListener('touchmove', e => { if(sw || lp || dg){ const t = e.touches[0]; pressMove(t.clientX, t.clientY, e); } }, {passive:false});
 document.addEventListener('touchend', pressEnd);
 document.addEventListener('touchcancel', pressEnd);
+const fromTouch = () => Date.now() - lastTouch < 1000;
 document.addEventListener('mousedown', e => {
+  if(fromTouch()) return;
   const li = e.target.closest('.item'); if(!li || e.button!==0 || e.target.closest('input')) return;
   pressStart(li, e.clientX, e.clientY);
 });
-document.addEventListener('mousemove', e => { if(sw || lp || dg) pressMove(e.clientX, e.clientY, null); });
-document.addEventListener('mouseup', pressEnd);
+document.addEventListener('mousemove', e => { if(!fromTouch() && (sw || lp || dg)) pressMove(e.clientX, e.clientY, null); });
+document.addEventListener('mouseup', () => { if(!fromTouch()) pressEnd(); });
 document.addEventListener('contextmenu', e => { if(e.target.closest('.item')) e.preventDefault(); });
 
 /* ============ Нажатия ============ */
@@ -671,6 +766,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'history': historySheet(); break;
+    case 'order-toggle': ui.orderClosed = !ui.orderClosed; saveUi(); renderOrder(); break;
     case 'undo': undo(); break;
     case 'redo': redo(); break;
     case 'menu': menuSheet(); break;
@@ -740,7 +836,8 @@ function menuSheet(){
     <ul>
       <li><b style="color:var(--req)">Обязательные</b> — повторяются каждую неделю. Когда день прошёл, галочки снимаются сами (отметки сохраняются в истории).</li>
       <li><b style="color:var(--once)">Разовые</b> — когда день прошёл, выполненные удаляются, а невыполненные переезжают на сегодня.</li>
-      <li><b style="color:var(--temp)">Список на день</b> — очищается целиком, когда его день прошёл.</li>
+      <li><b style="color:var(--temp)">Список на день</b> — по разделам (Напитки, Пиво, Бакалея…). Когда день прошёл, отмеченное удаляется, а неотмеченное переезжает в <b style="color:var(--danger)">🛒 Нужно заказать</b> — в тот же раздел.</li>
+      <li><b style="color:var(--danger)">Нужно заказать</b> — отметьте заказанное, и оно исчезнет в полночь.</li>
       <li>Нажмите на текст, чтобы исправить его или добавить заметку.</li>
       <li>Смахните влево, чтобы удалить. Удерживайте и тяните, чтобы переставить — можно в другой список или на другой день.</li>
       <li>Нажмите на название дня, чтобы свернуть или развернуть его.</li>
@@ -791,9 +888,18 @@ function importMerge(data){
         have.add(k);
         const n = {id: uid(), text: it.text, done: false};
         if(it.note) n.note = it.note;
+        if(it.cat) n.cat = it.cat;
         state[sec][d].push(n);
         added++;
       }
+    }
+    const haveO = new Set(state.order.map(x => normCat(x.cat) + '|' + x.text.trim().toLowerCase()));
+    for(const it of data.order){
+      const k = normCat(it.cat) + '|' + it.text.trim().toLowerCase();
+      if(haveO.has(k)) continue;
+      haveO.add(k);
+      state.order.push({id: uid(), text: it.text, done: it.done, cat: normCat(it.cat)});
+      added++;
     }
     for(const [k,v] of Object.entries(data.history)) if(!state.history[k]) state.history[k] = v;
   });

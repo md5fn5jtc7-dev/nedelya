@@ -1,6 +1,6 @@
 // Офлайн-режим: берём свежую версию из сети, но ждём не дольше 2 секунд —
 // при плохой связи сразу открываем сохранённую копию (а свежая подтянется в фоне).
-const CACHE = 'nedelya-v3';
+const CACHE = 'nedelya-v4';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-180.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
